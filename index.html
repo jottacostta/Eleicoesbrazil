@@ -380,6 +380,7 @@
         b.addEventListener('click', async () => {
           [...selector.querySelectorAll('[data-cargo]')].forEach(item => item.setAttribute('aria-pressed', String(item === b)));
           cargoAtual = cargo;
+          iniciarAutoRefresh();
           atualizarTurnButtons();
           if (CARGOS[cargo].nacional || perfilAtual === 'municipal' && cargo === 'vereador' || perfilAtual === 'municipal' && cargo === 'prefeito') {
             resultsEl.innerHTML = '<div class="loading">Consultando dados oficiais do TSE…</div>';
@@ -504,6 +505,7 @@
 
     let cargoAtual = 'presidente';
     let timer = null;
+    let autoRefreshHabilitado = true;
     let requestSeq = 0;
     let controller = null;
     let ultimaAtualizacaoTSE = null;
@@ -783,9 +785,21 @@
           errorBanner.hidden = false;
         } else {
           ultimaAtualizacaoTSE = new Date();
-          /* Atualiza o indicador visual somente depois de uma resposta válida. */
-          const note = document.querySelector('.status-note');
-          if (note) note.innerHTML = '<span class="status-dot" aria-hidden="true"></span> TSE ONLINE · atualização automática';
+
+          /*
+             Quando o TSE informar 100% das seções, a apuração deste cargo/turno
+             é considerada encerrada para o painel. A partir daqui não fazemos
+             novas consultas automáticas, evitando tráfego desnecessário.
+          */
+          if (Number.isFinite(dados.secoesPct) && dados.secoesPct >= 100) {
+            pararAutoRefresh();
+            const note = document.querySelector('.status-note');
+            if (note) note.innerHTML = '<span class="status-dot" aria-hidden="true"></span> TSE ONLINE · apuração encerrada (100% das seções)';
+          } else {
+            /* Atualiza o indicador visual somente depois de uma resposta válida. */
+            const note = document.querySelector('.status-note');
+            if (note) note.innerHTML = '<span class="status-dot" aria-hidden="true"></span> TSE ONLINE · atualização automática';
+          }
         }
       } catch (err) {
         console.error('Falha na atualização:', err);
@@ -811,6 +825,7 @@
             const base = CARGOS[cargo].label;
             active.textContent = `${base} · ${estadoAtual.toUpperCase()}`;
           }
+          iniciarAutoRefresh();
           resultsEl.innerHTML = '<div class="loading">Consultando dados oficiais do TSE…</div>';
           render(cargoAtual, `seleção de ${uf.toUpperCase()}`);
         });
@@ -830,6 +845,7 @@
       if (tipoEleicaoPorAno(ano) === 'municipal' && !eleicaoMunicipalDisponivel(ano)) return;
       if (tipoEleicaoPorAno(ano) !== 'geral' && tipoEleicaoPorAno(ano) !== 'municipal') return;
       configurarEleicao(ano);
+      iniciarAutoRefresh();
       resultsEl.innerHTML = '<div class="loading">Consultando configuração oficial do TSE…</div>';
       await carregarConfiguracaoTSE();
       atualizarTurnButtons();
@@ -842,21 +858,31 @@
       if (turno === 2 && !getEleicao(cargoAtual)) { atualizarTurnButtons(); return; }
       turnoAtual = turno;
       TSE_CONFIG.turno = turno;
+      iniciarAutoRefresh();
       turnButtons.forEach(item => item.setAttribute('aria-pressed', String(item === button)));
       atualizarPerfilVisual();
       resultsEl.innerHTML = '<div class="loading">Consultando dados oficiais do TSE…</div>';
       await render(cargoAtual, `seleção do ${turno}º turno`);
     }));
 
+    function pararAutoRefresh() {
+      autoRefreshHabilitado = false;
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    }
+
     function iniciarAutoRefresh() {
-      if (timer) clearInterval(timer);
+      autoRefreshHabilitado = true;
+      if (timer) return;
       timer = setInterval(() => {
-        if (!document.hidden) render(cargoAtual, 'atualização automática');
+        if (!document.hidden && autoRefreshHabilitado) render(cargoAtual, 'atualização automática');
       }, REFRESH_MS);
     }
 
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) render(cargoAtual, 'retorno à tela');
+      if (!document.hidden && autoRefreshHabilitado) render(cargoAtual, 'retorno à tela');
     });
 
     /*
@@ -902,7 +928,8 @@
     carregarConfiguracaoTSE().finally(() => {
       atualizarPerfilVisual();
       atualizarTurnButtons();
-      render(cargoAtual, 'inicial').then(iniciarAutoRefresh);
+      iniciarAutoRefresh();
+      render(cargoAtual, 'inicial');
     });
   </script>
 </body>
