@@ -752,14 +752,8 @@
       summaryEl.textContent = `${selecionado.label}${CARGOS[cargoAtual]?.nacional ? '' : ` · ${estadoAtual.toUpperCase()} — ${ESTADO_MAP[estadoAtual]}`} · ${turnoAtual}º turno · ${candidatos.length} candidaturas · ${fmtInt.format(total)} votos`;
 
       const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      // Exibição: quando a totalização chega a 99,99%, arredondamos visualmente
-      // para 100%. O valor bruto recebido do TSE continua preservado em secoesPct
-      // para não alterar os dados oficiais nem a lógica de atualização.
-      const secoesExibicao = Number.isFinite(selecionado.secoesPct) && selecionado.secoesPct >= 99.99
-        ? 100
-        : selecionado.secoesPct;
-      const secoesTxt = secoesExibicao != null
-        ? `${fmtPercent.format(secoesExibicao)}% das seções`
+      const secoesTxt = selecionado.secoesPct != null
+        ? `${fmtPercent.format(selecionado.secoesPct)}% das seções`
         : 'seções em apuração';
       const geradoTxt = selecionado.gerado ? ` · arquivo TSE: ${selecionado.gerado}` : '';
       metaEl.textContent = `${secoesTxt} · ${selecionado.fonte}${geradoTxt} · consulta ${agora}`;
@@ -793,21 +787,25 @@
           ultimaAtualizacaoTSE = new Date();
 
           /*
-             PRESIDENTE: a partir de 99,99% das seções, a interface exibe 100%
-             e a atualização automática é encerrada. O valor bruto do TSE continua
-             preservado em secoesPct. Outros cargos seguem atualizando normalmente
-             até 100%.
+             Quando o TSE informar 100% das seções, a apuração deste cargo/turno
+             é considerada encerrada para o painel. A partir daqui não fazemos
+             novas consultas automáticas, evitando tráfego desnecessário.
           */
-          const nota = document.querySelector('.status-note');
-          const deveEncerrarPresidente = cargo === 'presidente'
-            && Number.isFinite(dados.secoesPct)
-            && dados.secoesPct >= 99.99;
-
-          if (deveEncerrarPresidente) {
+          // Para Presidente, encerramos a atualização automática em 99,99%
+          // das seções, evitando que o painel fique consultando indefinidamente
+          // na reta final da totalização. Os demais cargos continuam até 100%.
+          const limiteEncerramento = cargo === 'presidente' ? 99.99 : 100;
+          if (Number.isFinite(dados.secoesPct) && dados.secoesPct >= limiteEncerramento) {
             pararAutoRefresh();
-            if (nota) nota.innerHTML = '<span class="status-dot" aria-hidden="true"></span> TSE ONLINE · apuração encerrada (99,99% das seções)';
-          } else if (nota) {
-            nota.innerHTML = '<span class="status-dot" aria-hidden="true"></span> TSE ONLINE · atualização automática';
+            const note = document.querySelector('.status-note');
+            if (note) {
+              const textoLimite = cargo === 'presidente' ? '99,99% das seções' : '100% das seções';
+              note.innerHTML = `<span class="status-dot" aria-hidden="true"></span> TSE ONLINE · apuração encerrada (${textoLimite})`;
+            }
+          } else {
+            /* Atualiza o indicador visual somente depois de uma resposta válida. */
+            const note = document.querySelector('.status-note');
+            if (note) note.innerHTML = '<span class="status-dot" aria-hidden="true"></span> TSE ONLINE · atualização automática';
           }
         }
       } catch (err) {
