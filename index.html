@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Apuração TSE · Eleições 2026/2028</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0f1a;
+      --panel: rgba(255,255,255,.055);
+      --line: rgba(255,255,255,.10);
+      --text: #eef2f8;
+      --muted: #9aa6b8;
+      --blue: #3b82f6;
+      --amber: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh; margin: 0; padding: 32px 16px 40px;
+      background: radial-gradient(ellipse at top, #1a2740 0, transparent 50%), linear-gradient(145deg,#0b0f1a,#171c2a);
+      color: var(--text); font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main { width: min(100%, 780px); margin: 0 auto; }
+    header { text-align: center; margin: 0 auto 28px; }
+    h1 { margin: 0 0 8px; font-size: clamp(1.45rem,4vw,2rem); letter-spacing: -.04em; background: linear-gradient(135deg,#c0e0ff,#8bb8ff); color: transparent; background-clip: text; -webkit-background-clip: text; }
+    .subtitle { margin: 0; color: var(--muted); font-size: .96rem; }
+    .status-note {
+      display: inline-flex; align-items: center; gap: 8px;
+      margin-top: 14px; padding: 6px 12px;
+      border: 1px solid rgba(96,165,250,.25); border-radius: 999px;
+      color: #bfdbfe; background: rgba(59,130,246,.10); font-size: .78rem;
+    }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: #22c55e;
+      box-shadow: 0 0 0 0 rgba(34,197,94,.5);
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(34,197,94,.45); }
+      70% { box-shadow: 0 0 0 8px rgba(34,197,94,0); }
+      100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+    }
+    .controls { display: flex; flex-wrap: wrap; justify-content: center; margin-bottom: 10px; }
+    .turn-controls { margin-bottom: 18px; }
+    .selector { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.05); }
+    .selector button { border: 0; border-radius: 999px; padding: 10px 18px; background: transparent; color: #b0bed0; font: inherit; font-size: .9rem; font-weight: 650; cursor: pointer; transition: background .2s,color .2s; }
+    .selector button:hover { color: #fff; }
+    .selector button[aria-pressed="true"] { background: var(--blue); color: #fff; box-shadow: 0 4px 14px rgba(59,130,246,.35); }
+    .summary { min-height: 24px; margin: 0 0 6px; text-align: center; color: var(--muted); font-size: .86rem; }
+    .meta { margin: 0 0 14px; text-align: center; color: #7a879c; font-size: .78rem; }
+    .results { display: grid; gap: 12px; }
+    .card { padding: 18px 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: 0 12px 30px rgba(0,0,0,.12); animation: fade-in .25s ease both; }
+    .card-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+    .candidate { display: flex; min-width: 0; align-items: center; gap: 12px; }
+    .avatar { display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; border-radius: 50%; background: #2a3348; color: #fff; font-size: .82rem; font-weight: 750; }
+    .candidate-name { overflow-wrap: anywhere; font-size: 1rem; font-weight: 750; }
+    .candidate-party { margin-top: 3px; color: var(--muted); font-size: .78rem; }
+    .numbers { flex: 0 0 auto; text-align: right; }
+    .votes { font-size: 1.08rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+    .percent { margin-top: 3px; color: var(--muted); font-size: .84rem; font-variant-numeric: tabular-nums; }
+    .track { width: 100%; height: 8px; margin-top: 15px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.08); }
+    .fill { height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg,#3b82f6,#60a5fa); transition: width .6s cubic-bezier(.22,1,.36,1); }
+    .card:first-child .fill { background: linear-gradient(90deg,#f59e0b,#fbbf24); }
+    .footer { margin-top: 26px; color: #8290a6; font-size: .78rem; line-height: 1.6; text-align: center; }
+    .footer a { color: #8bb8ff; text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+    .footer p { margin: 6px 0; }
+    .loading { text-align: center; color: var(--muted); padding: 40px 0; font-size: .95rem; }
+    .modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 18px; background: rgba(0,0,0,.68); backdrop-filter: blur(6px); }
+    .modal-backdrop[hidden] { display: none; }
+    .modal { width: min(100%, 680px); max-height: min(86vh, 760px); overflow: auto; padding: 20px; border: 1px solid var(--line); border-radius: 22px; background: #121827; box-shadow: 0 24px 80px rgba(0,0,0,.45); }
+    .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    .modal-title { margin: 0; font-size: 1.15rem; }
+    .modal-subtitle { margin: 4px 0 0; color: var(--muted); font-size: .8rem; }
+    .modal-close { border: 0; width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,.08); color: #fff; font-size: 1.2rem; cursor: pointer; }
+    .state-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+    .state-button { min-height: 48px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.045); color: var(--text); cursor: pointer; font: inherit; text-align: left; padding: 8px 10px; }
+    .state-button:hover, .state-button:focus-visible { border-color: rgba(59,130,246,.7); background: rgba(59,130,246,.12); outline: none; }
+    .state-button strong { display: block; font-size: .88rem; }
+    .state-button span { color: var(--muted); font-size: .72rem; }
+    @media (max-width: 480px) { .state-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    .error-banner {
+      margin-bottom: 14px; padding: 10px 14px; border-radius: 12px;
+      background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.3);
+      color: #fcd34d; font-size: .82rem; text-align: center;
+    }
+    @keyframes fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @media (max-width: 480px) {
+      body { padding: 24px 12px 32px; }
+      .selector button { padding: 9px 13px; font-size: .82rem; }
+      .card { padding: 15px; }
+      .votes { font-size: .96rem; }
+      .candidate-name { font-size: .94rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+      .status-dot { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Apuração TSE</h1>
+      <p class="subtitle" id="subtitle">Apuração oficial em tempo real · seleção de cargo, turno e UF</p>
+      <span class="status-note">
+        <span class="status-dot" aria-hidden="true"></span>
+        1º turno · atualização automática
+      </span>
+    </header>
+
+    <nav class="controls" aria-label="Escolher eleição">
+      <div class="selector" id="electionSelector" role="group" aria-label="Eleição">
+        <button type="button" id="btnEleicaoGeral" data-eleicao="2026" aria-pressed="true">2026 · Geral</button>
+        <button type="button" id="btnEleicaoMunicipal" data-eleicao="2028" aria-pressed="false" hidden>2028 · Municipal</button>
+      </div>
+    </nav>
+
+    <nav class="controls" aria-label="Escolher cargo">
+      <div class="selector" id="cargoSelector" role="group" aria-label="Cargo"></div>
+    </nav>
+    <div class="status-note" id="electionProfile" style="margin:0 auto 18px;display:table">Eleição: carregando configuração oficial do TSE…</div>
+
+    <nav class="controls turn-controls" aria-label="Escolher turno">
+      <div class="selector" role="group" aria-label="Turno">
+        <button type="button" data-turno="1" aria-pressed="true">1º Turno</button>
+        <button type="button" data-turno="2" aria-pressed="false">2º Turno</button>
+      </div>
+    </nav>
+
+    <div id="stateModal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="stateModalTitle">
+      <div class="modal">
+        <div class="modal-head">
+          <div>
+            <h2 id="stateModalTitle" class="modal-title">Escolha o estado</h2>
+            <p id="stateModalSubtitle" class="modal-subtitle">Selecione a UF para consultar a apuração oficial.</p>
+          </div>
+          <button id="closeStateModal" class="modal-close" type="button" aria-label="Fechar">×</button>
+        </div>
+        <div id="stateGrid" class="state-grid"></div>
+      </div>
+    </div>
+
+    <div id="errorBanner" class="error-banner" hidden></div>
+    <p class="summary" id="summary" aria-live="polite"></p>
+    <p class="meta" id="meta"></p>
+    <section class="results" id="results" aria-label="Resultados dos candidatos">
+      <div class="loading">Carregando dados oficiais…</div>
+    </section>
+
+    <footer class="footer">
+      <p>Dados oficiais do <a href="https://resultados.tse.jus.br" target="_blank" rel="noopener noreferrer">Tribunal Superior Eleitoral</a> · configuração de eleição dinâmica · 1º e 2º turnos.</p>
+      <p>O painel consulta diretamente os arquivos JSON oficiais do TSE. Se o navegador bloquear a consulta (CORS) ou o TSE estiver indisponível, o painel identifica explicitamente o fallback local; ele nunca é apresentado como dado ao vivo.</p>
+    </footer>
+  </main>
+
+  <script>
+    'use strict';
+
+    /* ================================================================
+       APURAÇÃO TSE — núcleo de dados revisado
+       Endpoint oficial: /oficial/<ciclo>/<eleição>/dados/...
+       Estrutura: carg -> agr -> par -> cand
+       ================================================================ */
+    /* ================================================================
+       CONFIGURAÇÃO DA ELEIÇÃO
+       Edite somente este bloco para preparar uma nova eleição, caso o
+       TSE altere o ciclo/ambiente/códigos. O restante do sistema é genérico.
+       ================================================================ */
+    const TSE_CONFIG = {
+      ano: 2026,
+      ciclo: 'ele2026',
+      ambiente: 'oficial',
+      turno: 1,
+      eleicoes: { federal: '6257', estadual: '6259', municipal: null },
+      eleicoesPorTurno: {
+        1: { federal: '6257', estadual: '6259', municipal: null },
+        2: { federal: '6258', estadual: '6260', municipal: null }
+      },
+      autoConfigUrl: 'https://resultados.tse.jus.br/oficial/comum/config/ele-c.json'
+    };
+
+    function getApiBase() { return `https://resultados.tse.jus.br/${TSE_CONFIG.ambiente}/${TSE_CONFIG.ciclo}`; }
+    const REFRESH_MS = 5000;
+
+    // Compatibilidade com futuras eleições: uma configuração externa pode
+    // sobrescrever os valores acima antes do carregamento, via window.TSE_CONFIG_OVERRIDE.
+    const CONFIG_OVERRIDE = window.TSE_CONFIG_OVERRIDE || null;
+    if (CONFIG_OVERRIDE && typeof CONFIG_OVERRIDE === 'object') {
+      Object.assign(TSE_CONFIG, CONFIG_OVERRIDE);
+      if (CONFIG_OVERRIDE.eleicoes) Object.assign(TSE_CONFIG.eleicoes, CONFIG_OVERRIDE.eleicoes);
+    }
+
+    const ESTADOS = [
+      ['ac','Acre'], ['al','Alagoas'], ['ap','Amapá'], ['am','Amazonas'], ['ba','Bahia'], ['ce','Ceará'],
+      ['df','Distrito Federal'], ['es','Espírito Santo'], ['go','Goiás'], ['ma','Maranhão'], ['mt','Mato Grosso'],
+      ['ms','Mato Grosso do Sul'], ['mg','Minas Gerais'], ['pa','Pará'], ['pb','Paraíba'], ['pr','Paraná'],
+      ['pe','Pernambuco'], ['pi','Piauí'], ['rj','Rio de Janeiro'], ['rn','Rio Grande do Norte'], ['rs','Rio Grande do Sul'],
+      ['ro','Rondônia'], ['rr','Roraima'], ['sc','Santa Catarina'], ['sp','São Paulo'], ['se','Sergipe'], ['to','Tocantins']
+    ];
+    const ESTADO_MAP = Object.fromEntries(ESTADOS.map(([uf, nome]) => [uf, nome]));
+    let estadoAtual = 'rj';
+    let turnoAtual = Number(TSE_CONFIG.turno) || 1;
+
+    const PERFIS = {
+      geral: {
+        ano: 2026,
+        label: 'Eleições Gerais',
+        cargos: {
+          presidente: { label: 'Presidente', tipoEleicao: 'federal', cargo: '0001', nacional: true },
+          governador: { label: 'Governador', tipoEleicao: 'estadual', cargo: '0003' },
+          senador: { label: 'Senador', tipoEleicao: 'estadual', cargo: '0005' },
+          deputadoFederal: { label: 'Deputado Federal', tipoEleicao: 'estadual', cargo: '0006' },
+          deputadoEstadual: { label: 'Deputado Estadual', tipoEleicao: 'estadual', cargo: '0007' }
+        }
+      },
+      municipal: {
+        ano: 2028,
+        label: 'Eleições Municipais',
+        cargos: {
+          prefeito: { label: 'Prefeito', tipoEleicao: 'municipal', cargo: '0003' },
+          vereador: { label: 'Vereador', tipoEleicao: 'municipal', cargo: '0013' }
+        }
+      }
+    };
+
+    let CARGOS = PERFIS.geral.cargos;
+    let perfilAtual = 'geral';
+    let CONFIG_MANUAL = false;
+    let eleicaoAtual = 2026;
+
+    // Calendário eleitoral brasileiro: 2026, 2030, 2034... = Gerais;
+    // 2028, 2032, 2036... = Municipais. A interface usa o ano do ciclo
+    // atual sem precisar ser alterada manualmente a cada nova eleição.
+    function tipoEleicaoPorAno(ano) {
+      return Number(ano) % 4 === 2 ? 'geral' : Number(ano) % 4 === 0 ? 'municipal' : null;
+    }
+
+    function proximaEleicaoAno(ano = new Date().getFullYear()) {
+      const y = Number(ano);
+      const resto = ((y % 4) + 4) % 4;
+      if (resto === 2 || resto === 0) return y;
+      return y + (resto === 1 ? 1 : 3);
+    }
+
+    function ultimaEleicaoAno(ano = new Date().getFullYear()) {
+      const y = Number(ano);
+      const resto = ((y % 4) + 4) % 4;
+      if (resto === 2 || resto === 0) return y;
+      return y - (resto === 1 ? 3 : 1);
+    }
+
+    function eleicaoMunicipalDisponivel(ano = eleicaoAtual) {
+      const agora = new Date();
+      return Number(ano) % 4 === 0 && agora.getFullYear() === Number(ano) && agora.getMonth() === 9;
+    }
+
+    function obterAnoInicial() {
+      // Mantém 2026 como referência histórica até a chegada do próximo
+      // ciclo; em cada novo ano eleitoral a interface assume automaticamente
+      // o ano correspondente.
+      const anoAtual = new Date().getFullYear();
+      const ciclo = tipoEleicaoPorAno(anoAtual);
+      if (ciclo) return anoAtual;
+      return ultimaEleicaoAno(anoAtual);
+    }
+
+    function configurarEleicao(ano, preservarTurno = false) {
+      const tipo = tipoEleicaoPorAno(Number(ano));
+      if (!tipo) return;
+      eleicaoAtual = Number(ano);
+      perfilAtual = tipo;
+      CARGOS = PERFIS[perfilAtual].cargos;
+      TSE_CONFIG.ano = eleicaoAtual;
+      TSE_CONFIG.ciclo = `ele${eleicaoAtual}`;
+      if (!preservarTurno) { turnoAtual = 1; TSE_CONFIG.turno = 1; }
+      cargoAtual = Object.keys(CARGOS)[0];
+      renderElectionButtons();
+      renderCargoButtons();
+      atualizarPerfilVisual();
+      atualizarTurnButtons();
+    }
+
+    function atualizarVisibilidadeEleicoes() {
+      const geral = document.getElementById('btnEleicaoGeral');
+      const municipal = document.getElementById('btnEleicaoMunicipal');
+      if (!geral || !municipal) return;
+
+      const anoAtual = new Date().getFullYear();
+      const tipoAtual = tipoEleicaoPorAno(anoAtual);
+      const anoGeral = tipoAtual === 'geral' ? anoAtual : tipoAtual === 'municipal' ? anoAtual - 2 : null;
+      const anoMunicipal = tipoAtual === 'municipal' ? anoAtual : anoGeral ? anoGeral + 2 : null;
+
+      // O botão de eleição geral representa o ciclo geral vigente.
+      // O municipal só aparece no próprio ano eleitoral e exclusivamente em outubro.
+      if (anoGeral) {
+        geral.dataset.eleicao = String(anoGeral);
+        geral.textContent = `${anoGeral} · Geral`;
+        geral.hidden = false;
+      } else {
+        geral.hidden = true;
+      }
+
+      const municipalDisponivel = Boolean(anoMunicipal && anoAtual === anoMunicipal && new Date().getMonth() === 9);
+      if (anoMunicipal) {
+        municipal.dataset.eleicao = String(anoMunicipal);
+        municipal.textContent = `${anoMunicipal} · Municipal`;
+      }
+      municipal.hidden = !municipalDisponivel;
+      municipal.setAttribute('aria-hidden', String(!municipalDisponivel));
+
+      // Se o municipal não estiver no período de exibição, nunca mantém o perfil municipal ativo.
+      if (!municipalDisponivel && perfilAtual === 'municipal') {
+        if (anoGeral) configurarEleicao(anoGeral, true);
+      }
+    }
+
+    function renderElectionButtons() {
+      const selector = document.getElementById('electionSelector');
+      if (!selector) return;
+      atualizarVisibilidadeEleicoes();
+      selector.querySelectorAll('[data-eleicao]').forEach(b => {
+        const ano = Number(b.dataset.eleicao);
+        b.setAttribute('aria-pressed', String(ano === eleicaoAtual));
+      });
+    }
+
+    function atualizarTurnButtons() {
+      turnButtons.forEach(b => {
+        const turno = Number(b.dataset.turno);
+        const tipo = CARGOS[cargoAtual]?.tipoEleicao;
+        const habilitado = turno === 1 || Boolean(TSE_CONFIG.eleicoesPorTurno?.[2]?.[tipo]);
+        b.disabled = !habilitado;
+        b.title = habilitado ? '' : 'Segundo turno ainda não disponível na configuração oficial do TSE.';
+      });
+      if (turnoAtual === 2 && turnButtons.find(b => Number(b.dataset.turno) === 2)?.disabled) {
+        turnoAtual = 1; TSE_CONFIG.turno = 1;
+      }
+      turnButtons.forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.turno) === turnoAtual)));
+    }
+
+    function getEleicao(cargo) {
+      const cfg = CARGOS[cargo];
+      if (!cfg) return null;
+      const tipo = cfg.tipoEleicao;
+      return TSE_CONFIG.eleicoesPorTurno?.[turnoAtual]?.[tipo] || TSE_CONFIG.eleicoes?.[tipo] || null;
+    }
+
+    function temSegundoTurno(cargo) {
+      return ['presidente', 'governador', 'prefeito'].includes(cargo);
+    }
+
+    function selecionarPerfil() {
+      const ano = Number(TSE_CONFIG.ano);
+      const tipo = tipoEleicaoPorAno(ano);
+      if (!tipo) return configurarEleicao(obterAnoInicial(), true);
+      eleicaoAtual = ano;
+      perfilAtual = tipo;
+      CARGOS = PERFIS[perfilAtual].cargos;
+      cargoAtual = Object.keys(CARGOS)[0];
+      renderElectionButtons();
+      renderCargoButtons();
+      atualizarPerfilVisual();
+      atualizarTurnButtons();
+    }
+
+    function renderCargoButtons() {
+      const selector = document.getElementById('cargoSelector');
+      selector.replaceChildren();
+      const keys = Object.keys(CARGOS);
+      cargoAtual = keys[0];
+      keys.forEach((cargo, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.dataset.cargo = cargo;
+        b.setAttribute('aria-pressed', String(i === 0));
+        b.textContent = CARGOS[cargo].label;
+        b.addEventListener('click', async () => {
+          [...selector.querySelectorAll('[data-cargo]')].forEach(item => item.setAttribute('aria-pressed', String(item === b)));
+          cargoAtual = cargo;
+          atualizarTurnButtons();
+          if (CARGOS[cargo].nacional || perfilAtual === 'municipal' && cargo === 'vereador' || perfilAtual === 'municipal' && cargo === 'prefeito') {
+            resultsEl.innerHTML = '<div class="loading">Consultando dados oficiais do TSE…</div>';
+            if (CARGOS[cargo].nacional) {
+              await render(cargo, 'troca de cargo');
+            } else {
+              abrirEstados(cargo);
+            }
+          } else {
+            abrirEstados(cargo);
+          }
+        });
+        selector.appendChild(b);
+      });
+    }
+
+    function atualizarPerfilVisual() {
+      const p = document.getElementById('electionProfile');
+      const subtitle = document.getElementById('subtitle');
+      const turnoNote = document.querySelector('header .status-note');
+      if (p) p.textContent = `${TSE_CONFIG.ano} · ${PERFIS[perfilAtual].label} · ciclo ${TSE_CONFIG.ciclo}`;
+      if (subtitle) subtitle.textContent = `${TSE_CONFIG.ano} · apuração oficial em tempo real · configuração dinâmica do TSE`;
+      document.title = `Apuração TSE · Eleições ${TSE_CONFIG.ano}`;
+      if (turnoNote) turnoNote.innerHTML = `<span class="status-dot" aria-hidden="true"></span> ${turnoAtual}º turno · atualização automática`;
+    }
+
+    async function carregarConfiguracaoTSE() {
+      try {
+        const r = await fetch(`${TSE_CONFIG.autoConfigUrl}?cb=${Date.now()}`, { cache: 'no-store' });
+        if (!r.ok) throw new Error(`ele-c.json HTTP ${r.status}`);
+        const data = await r.json();
+        if ((!CONFIG_MANUAL || data.c === `ele${TSE_CONFIG.ano}`) && typeof data.c === 'string' && /^ele\d{4}$/.test(data.c)) {
+          TSE_CONFIG.ciclo = data.c;
+          TSE_CONFIG.ano = Number(data.c.slice(3));
+        }
+        const pleitos = Array.isArray(data.pl) ? data.pl : [];
+        for (const pl of pleitos) {
+          for (const e of (Array.isArray(pl.e) ? pl.e : [])) {
+            const nome = String(e.nm || '').toLowerCase();
+            const tipo = nome.includes('federal') ? 'federal' : nome.includes('estadual') ? 'estadual' : nome.includes('municipal') ? 'municipal' : null;
+            const turno = Number(e.t);
+            if (!tipo || ![1, 2].includes(turno) || !e.cd) continue;
+            TSE_CONFIG.eleicoesPorTurno[turno] ||= {};
+            TSE_CONFIG.eleicoesPorTurno[turno][tipo] = String(e.cd);
+            if (turno === 1) TSE_CONFIG.eleicoes[tipo] = String(e.cd);
+            if (turno === 1 && e.cdt2) TSE_CONFIG.eleicoesPorTurno[2][tipo] = String(e.cdt2);
+          }
+        }
+        selecionarPerfil();
+        return true;
+      } catch (err) {
+        selecionarPerfil();
+        return false;
+      }
+    }
+
+    function urlsCargo(cargo) {
+      const cfg = CARGOS[cargo];
+      const eleicao = getEleicao(cargo);
+      if (!eleicao) return [];
+      if (cfg.nacional) {
+        return [`${getApiBase()}/${eleicao}/dados/br/br-c${cfg.cargo}-e${String(eleicao).padStart(6, '0')}-u.json`];
+      }
+      const uf = estadoAtual;
+      const cargoCode = (cargo === 'deputadoEstadual' && uf === 'df') ? '0008' : cfg.cargo;
+      return [`${getApiBase()}/${eleicao}/dados/${uf}/${uf}-c${cargoCode}-e${String(eleicao).padStart(6, '0')}-u.json`];
+    }
+
+    /* Snapshot de segurança. Nunca é apresentado como dado ao vivo. */
+    const FALLBACK = {
+      presidente: {
+        candidatos: [
+          { nome: 'Flávio Bolsonaro', partido: 'PL', votos: 37566895, percentual: 49.58 },
+          { nome: 'Lula', partido: 'PT', votos: 32007853, percentual: 42.25 },
+          { nome: 'Escritor Augusto Cury', partido: 'AVANTE', votos: 2247926, percentual: 2.97 },
+          { nome: 'Ronaldo Caiado', partido: 'PSD', votos: 1774893, percentual: 2.34 },
+          { nome: 'Renan Santos', partido: 'MISSÃO', votos: 1772742, percentual: 2.34 },
+          { nome: 'Zema', partido: 'NOVO', votos: 220598, percentual: 0.29 },
+          { nome: 'Samara', partido: 'UP', votos: 80928, percentual: 0.11 },
+          { nome: 'Hertz Dias', partido: 'PSTU', votos: 28466, percentual: 0.04 },
+          { nome: 'Clariana Barão', partido: 'DC', votos: 26802, percentual: 0.04 },
+          { nome: 'Edmilson Costa', partido: 'PCB', votos: 14415, percentual: 0.02 },
+          { nome: 'Veterinário Wilson Grassi', partido: 'DEMOCRATA', votos: 11041, percentual: 0.01 },
+          { nome: 'Rui Costa Pimenta', partido: 'PCO', votos: 10267, percentual: 0.01 }
+        ],
+        secoesPct: 64.81,
+        fonte: 'snapshot local — NÃO é atualização do TSE'
+      },
+      governador: {
+        candidatos: [
+          { nome: 'Douglas Ruas', partido: 'PL', votos: 2359207, percentual: 50.69 },
+          { nome: 'Eduardo Paes', partido: 'PSD', votos: 1912994, percentual: 41.10 },
+          { nome: 'Garotinho', partido: 'REPUBLICANOS', votos: 157125, percentual: 3.38 },
+          { nome: 'William Siri', partido: 'PSOL', votos: 126059, percentual: 2.71 },
+          { nome: 'Coronel Busnello', partido: 'MISSÃO', votos: 45813, percentual: 0.98 },
+          { nome: 'André Marinho', partido: 'NOVO', votos: 24911, percentual: 0.54 },
+          { nome: 'Juliete', partido: 'UP', votos: 18538, percentual: 0.40 },
+          { nome: 'Cyro Garcia', partido: 'PSTU', votos: 7905, percentual: 0.17 },
+          { nome: 'Luan Monteiro', partido: 'PCO', votos: 1570, percentual: 0.03 }
+        ],
+        secoesPct: 56.91,
+        fonte: 'snapshot local — NÃO é atualização do TSE'
+      },
+      senador: { candidatos: [], secoesPct: null, fonte: 'sem snapshot local — aguardando arquivo oficial do TSE' },
+      deputadoFederal: { candidatos: [], secoesPct: null, fonte: 'sem snapshot local — aguardando arquivo oficial do TSE' },
+      deputadoEstadual: { candidatos: [], secoesPct: null, fonte: 'sem snapshot local — aguardando arquivo oficial do TSE' }
+    };
+
+    const resultsEl = document.getElementById('results');
+    const summaryEl = document.getElementById('summary');
+    const metaEl = document.getElementById('meta');
+    const errorBanner = document.getElementById('errorBanner');
+    const turnButtons = [...document.querySelectorAll('[data-turno]')];
+    const stateModal = document.getElementById('stateModal');
+    const stateGrid = document.getElementById('stateGrid');
+    const stateModalTitle = document.getElementById('stateModalTitle');
+    const stateModalSubtitle = document.getElementById('stateModalSubtitle');
+    const closeStateModal = document.getElementById('closeStateModal');
+
+    const fmtInt = new Intl.NumberFormat('pt-BR');
+    const fmtPercent = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    let cargoAtual = 'presidente';
+    let timer = null;
+    let requestSeq = 0;
+    let controller = null;
+    let ultimaAtualizacaoTSE = null;
+
+    function initials(name) {
+      return name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toLocaleUpperCase('pt-BR') || '?';
+    }
+
+    function parseNumber(value) {
+      if (value === null || value === undefined || value === '') return 0;
+      if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+      const text = String(value).trim();
+      if (!text) return 0;
+      /* votos: 37.566.895 / 37566895 / 37,566,895 */
+      const normalized = text.replace(/\./g, '').replace(/,/g, '.');
+      const n = Number(normalized);
+      if (Number.isFinite(n)) return n;
+      const digits = text.replace(/\D/g, '');
+      return Number(digits) || 0;
+    }
+
+    function parsePercent(value) {
+      if (value === null || value === undefined || value === '') return 0;
+      if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+      const text = String(value).trim().replace('%', '').replace(',', '.');
+      const n = Number(text);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function formatTseDateTime(raw) {
+      const date = String(raw || '').trim();
+      if (!date) return null;
+      /* O TSE costuma fornecer dg/hg separados. Mantemos o valor original. */
+      return date;
+    }
+
+    function extrairCandidatos(raw) {
+      const encontrados = [];
+      const vistos = new Set();
+
+      function visitar(node, partidoAtual = '') {
+        if (!node || typeof node !== 'object') return;
+
+        if (Array.isArray(node)) {
+          for (const item of node) visitar(item, partidoAtual);
+          return;
+        }
+
+        const partido = String(node.sg || node.partido || partidoAtual || '').trim();
+
+        if (Array.isArray(node.cand)) {
+          for (const c of node.cand) {
+            if (!c || typeof c !== 'object') continue;
+            const nome = String(c.nmu || c.nm || c.nome || c.n || '').replace(/\s+/g, ' ').trim();
+            if (!nome) continue;
+            const id = String(c.sqcand || c.seq || c.n || `${nome}|${partido}`);
+            if (vistos.has(id)) continue;
+            vistos.add(id);
+            encontrados.push({
+              id,
+              nome,
+              partido: String(c.sg || c.partido || partido || '').trim(),
+              votos: parseNumber(c.vap ?? c.votos ?? c.v ?? 0),
+              percentual: parsePercent(c.pvap ?? c.percentual ?? c.pc ?? 0),
+              situacao: String(c.st || '').trim(),
+              eleito: String(c.e || '').toLowerCase() === 's'
+            });
+          }
+        }
+
+        /* Percorre o JSON oficial mesmo se o TSE alterar algum nível intermediário. */
+        for (const [key, value] of Object.entries(node)) {
+          if (key === 'cand') continue;
+          if (value && typeof value === 'object') visitar(value, partido);
+        }
+      }
+
+      visitar(raw);
+      return encontrados;
+    }
+
+    function obterProgresso(raw) {
+      const s = raw?.s || raw?.status || {};
+      const e = raw?.e || {};
+      const v = raw?.v || {};
+      return {
+        secoesTotal: parseNumber(s.ts),
+        secoesApuradas: parseNumber(s.st),
+        secoesPct: parsePercent(s.pst),
+        eleitorado: parseNumber(e.te),
+        eleitoradoApurado: parseNumber(e.est),
+        votosValidos: parseNumber(v.tvn),
+        votosTotal: parseNumber(v.tv),
+        data: String(raw?.dg || raw?.data || '').trim(),
+        hora: String(raw?.hg || raw?.hora || '').trim()
+      };
+    }
+
+    async function tentarFetch(urls, seq) {
+      if (controller) controller.abort();
+      controller = new AbortController();
+
+      let ultimoErro = null;
+      for (const baseUrl of urls) {
+        const url = `${baseUrl}?nocache=${Date.now()}-${seq}`;
+        try {
+          const res = await fetch(url, {
+            method: 'GET',
+            cache: 'no-store',
+            credentials: 'omit',
+            headers: { 'Accept': 'application/json' },
+            signal: controller.signal
+          });
+
+          if (!res.ok) {
+            ultimoErro = new Error(`HTTP ${res.status}`);
+            continue;
+          }
+
+          const json = await res.json();
+          const candidatos = extrairCandidatos(json);
+          if (!candidatos.length) {
+            ultimoErro = new Error('JSON recebido, mas nenhuma candidatura foi localizada.');
+            continue;
+          }
+
+          if (seq !== requestSeq) return null;
+
+          const progresso = obterProgresso(json);
+          const gerado = formatTseDateTime(progresso.data) && formatTseDateTime(progresso.hora)
+            ? `${progresso.data} ${progresso.hora}`
+            : null;
+
+          return {
+            candidatos,
+            ...progresso,
+            gerado,
+            fonte: 'TSE · arquivo oficial',
+            url,
+            raw: json,
+            isFallback: false
+          };
+        } catch (err) {
+          if (err?.name === 'AbortError') return null;
+          ultimoErro = err;
+        }
+      }
+
+      throw ultimoErro || new Error('Não foi possível consultar o TSE.');
+    }
+
+    async function carregarDados(cargo, seq) {
+      const cfg = CARGOS[cargo];
+      try {
+        return { label: cfg.nacional ? cfg.label : `${cfg.label} (${estadoAtual.toUpperCase()})`, ...(await tentarFetch(urlsCargo(cargo), seq)) };
+      } catch (err) {
+        /* Snapshots estaduais existentes nesta versão são somente do RJ.
+           Nunca reutilizar um snapshot do RJ para outra UF. */
+        const fb = (estadoAtual === 'rj') ? FALLBACK[cargo] : null;
+        if (fb) {
+          return {
+            label: cfg.nacional ? cfg.label : `${cfg.label} (${estadoAtual.toUpperCase()})`,
+            candidatos: fb.candidatos,
+            secoesPct: fb.secoesPct,
+            fonte: fb.fonte,
+            isFallback: true,
+            erro: err?.message || 'Falha desconhecida'
+          };
+        }
+        return {
+          label: `${cfg.label} (${estadoAtual.toUpperCase()})`,
+          candidatos: [],
+          secoesPct: null,
+          fonte: 'TSE indisponível — sem snapshot local para esta UF',
+          isFallback: true,
+          erro: err?.message || 'Falha desconhecida'
+        };
+      }
+    }
+
+    function renderCards(selecionado) {
+      const candidatos = [...selecionado.candidatos].sort((a, b) => b.votos - a.votos);
+      const total = candidatos.reduce((s, c) => s + c.votos, 0);
+      const fragment = document.createDocumentFragment();
+
+      candidatos.forEach((candidate, index) => {
+        const percentual = candidate.percentual > 0
+          ? candidate.percentual
+          : (total ? candidate.votos / total * 100 : 0);
+
+        const card = document.createElement('article');
+        card.className = 'card';
+        card.style.animationDelay = `${Math.min(index, 12) * 35}ms`;
+
+        const head = document.createElement('div');
+        head.className = 'card-head';
+        const info = document.createElement('div');
+        info.className = 'candidate';
+        const avatar = document.createElement('div');
+        avatar.className = 'avatar';
+        avatar.setAttribute('aria-hidden', 'true');
+        avatar.textContent = initials(candidate.nome);
+        const text = document.createElement('div');
+        const name = document.createElement('div');
+        name.className = 'candidate-name';
+        name.textContent = candidate.nome;
+        const party = document.createElement('div');
+        party.className = 'candidate-party';
+        party.textContent = candidate.partido || selecionado.label;
+        text.append(name, party);
+        info.append(avatar, text);
+
+        const numbers = document.createElement('div');
+        numbers.className = 'numbers';
+        const votes = document.createElement('div');
+        votes.className = 'votes';
+        votes.textContent = fmtInt.format(candidate.votos);
+        const pct = document.createElement('div');
+        pct.className = 'percent';
+        pct.textContent = `${fmtPercent.format(percentual)}%`;
+        numbers.append(votes, pct);
+        head.append(info, numbers);
+
+        const track = document.createElement('div');
+        track.className = 'track';
+        track.setAttribute('role', 'img');
+        track.setAttribute('aria-label', `${fmtPercent.format(percentual)} por cento dos votos válidos`);
+        const fill = document.createElement('div');
+        fill.className = 'fill';
+        fill.style.width = `${Math.max(0, Math.min(percentual, 100))}%`;
+        track.append(fill);
+        card.append(head, track);
+        fragment.append(card);
+      });
+
+      if (!candidatos.length) {
+        const empty = document.createElement('div');
+        empty.className = 'loading';
+        empty.textContent = 'Nenhuma candidatura disponível nesta resposta. O painel continuará tentando o arquivo oficial do TSE.';
+        fragment.append(empty);
+      }
+
+      resultsEl.replaceChildren(fragment);
+      summaryEl.textContent = `${selecionado.label}${CARGOS[cargoAtual]?.nacional ? '' : ` · ${estadoAtual.toUpperCase()} — ${ESTADO_MAP[estadoAtual]}`} · ${turnoAtual}º turno · ${candidatos.length} candidaturas · ${fmtInt.format(total)} votos`;
+
+      const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const secoesTxt = selecionado.secoesPct != null
+        ? `${fmtPercent.format(selecionado.secoesPct)}% das seções`
+        : 'seções em apuração';
+      const geradoTxt = selecionado.gerado ? ` · arquivo TSE: ${selecionado.gerado}` : '';
+      metaEl.textContent = `${secoesTxt} · ${selecionado.fonte}${geradoTxt} · consulta ${agora}`;
+    }
+
+    async function render(cargo, motivo = 'automática') {
+      cargoAtual = cargo;
+      const seq = ++requestSeq;
+      errorBanner.hidden = true;
+
+      if (turnoAtual === 2 && (!temSegundoTurno(cargo) || !getEleicao(cargo))) {
+        const cfg = CARGOS[cargo];
+        setStatus('TSE DISPONÍVEL · cargo sem 2º turno', 'online');
+        summaryEl.textContent = `${cfg.label} · 2º turno não aplicável`;
+        resultsEl.innerHTML = '<div class="loading"><strong>2º turno não aplicável.</strong><br>O 2º turno só é exibido quando previsto e identificado na configuração oficial do TSE para o cargo selecionado.</div>';
+        return;
+      }
+      errorBanner.textContent = '';
+      errorBanner.textContent = '';
+
+      try {
+        const dados = await carregarDados(cargo, seq);
+        if (seq !== requestSeq) return;
+
+        renderCards(dados);
+
+        if (dados.isFallback) {
+          errorBanner.textContent = `SEM CONEXÃO COM O TSE (${motivo}). Exibindo snapshot local antigo. Erro: ${dados.erro}`;
+          errorBanner.hidden = false;
+        } else {
+          ultimaAtualizacaoTSE = new Date();
+          /* Atualiza o indicador visual somente depois de uma resposta válida. */
+          const note = document.querySelector('.status-note');
+          if (note) note.innerHTML = '<span class="status-dot" aria-hidden="true"></span> TSE ONLINE · atualização automática';
+        }
+      } catch (err) {
+        console.error('Falha na atualização:', err);
+      }
+    }
+
+    function abrirEstados(cargo) {
+      const cfg = CARGOS[cargo];
+      stateModalTitle.textContent = `${cfg.label} · escolha o estado`;
+      stateModalSubtitle.textContent = 'A apuração será consultada no arquivo oficial do TSE para a UF selecionada.';
+      stateGrid.replaceChildren();
+      for (const [uf, nome] of ESTADOS) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'state-button';
+        b.dataset.uf = uf;
+        b.innerHTML = `<strong>${uf.toUpperCase()} · ${nome}</strong><span>${uf === estadoAtual ? 'Estado selecionado' : 'Selecionar'}</span>`;
+        b.addEventListener('click', () => {
+          estadoAtual = uf;
+          stateModal.hidden = true;
+          const active = document.querySelector('[data-cargo][aria-pressed="true"]');
+          if (active) {
+            const base = CARGOS[cargo].label;
+            active.textContent = `${base} · ${estadoAtual.toUpperCase()}`;
+          }
+          resultsEl.innerHTML = '<div class="loading">Consultando dados oficiais do TSE…</div>';
+          render(cargoAtual, `seleção de ${uf.toUpperCase()}`);
+        });
+        stateGrid.append(b);
+      }
+      stateModal.hidden = false;
+      closeStateModal.focus();
+    }
+
+    function fecharEstados() { stateModal.hidden = true; }
+    closeStateModal.addEventListener('click', fecharEstados);
+    stateModal.addEventListener('click', e => { if (e.target === stateModal) fecharEstados(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !stateModal.hidden) fecharEstados(); });
+
+    document.querySelectorAll('[data-eleicao]').forEach(button => button.addEventListener('click', async () => {
+      const ano = Number(button.dataset.eleicao);
+      if (tipoEleicaoPorAno(ano) === 'municipal' && !eleicaoMunicipalDisponivel(ano)) return;
+      if (tipoEleicaoPorAno(ano) !== 'geral' && tipoEleicaoPorAno(ano) !== 'municipal') return;
+      configurarEleicao(ano);
+      resultsEl.innerHTML = '<div class="loading">Consultando configuração oficial do TSE…</div>';
+      await carregarConfiguracaoTSE();
+      atualizarTurnButtons();
+      await render(cargoAtual, `seleção das Eleições ${ano}`);
+    }));
+
+    turnButtons.forEach(button => button.addEventListener('click', async () => {
+      const turno = Number(button.dataset.turno);
+      if (![1, 2].includes(turno)) return;
+      if (turno === 2 && !getEleicao(cargoAtual)) { atualizarTurnButtons(); return; }
+      turnoAtual = turno;
+      TSE_CONFIG.turno = turno;
+      turnButtons.forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+      atualizarPerfilVisual();
+      resultsEl.innerHTML = '<div class="loading">Consultando dados oficiais do TSE…</div>';
+      await render(cargoAtual, `seleção do ${turno}º turno`);
+    }));
+
+    function iniciarAutoRefresh() {
+      if (timer) clearInterval(timer);
+      timer = setInterval(() => {
+        if (!document.hidden) render(cargoAtual, 'atualização automática');
+      }, REFRESH_MS);
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) render(cargoAtual, 'retorno à tela');
+    });
+
+    /*
+       Preparação para eleições futuras:
+       ?ano=2030&ciclo=ele2030&federal=XXXX&estadual=YYYY&turno=1
+       ou defina window.TSE_CONFIG_OVERRIDE antes deste script.
+       Os códigos oficiais devem ser obtidos do arquivo de configuração do TSE.
+    */
+    const params = new URLSearchParams(location.search);
+    const paramTurno = Number(params.get('turno'));
+    if ([1, 2].includes(paramTurno)) {
+      turnoAtual = paramTurno;
+      TSE_CONFIG.turno = paramTurno;
+      turnButtons.forEach(item => item.setAttribute('aria-pressed', String(Number(item.dataset.turno) === turnoAtual)));
+    }
+    if (params.get('ano')) {
+      const anoParam = Number(params.get('ano'));
+      const tipoParam = tipoEleicaoPorAno(anoParam);
+      if (tipoParam === 'geral') TSE_CONFIG.ano = anoParam;
+      if (tipoParam === 'municipal' && eleicaoMunicipalDisponivel(anoParam)) TSE_CONFIG.ano = anoParam;
+    }
+    if (params.get('ciclo')) TSE_CONFIG.ciclo = params.get('ciclo');
+    if (params.get('federal')) {
+      TSE_CONFIG.eleicoes.federal = params.get('federal');
+      TSE_CONFIG.eleicoesPorTurno[turnoAtual] ||= {};
+      TSE_CONFIG.eleicoesPorTurno[turnoAtual].federal = params.get('federal');
+    }
+    if (params.get('estadual')) {
+      TSE_CONFIG.eleicoes.estadual = params.get('estadual');
+      TSE_CONFIG.eleicoesPorTurno[turnoAtual] ||= {};
+      TSE_CONFIG.eleicoesPorTurno[turnoAtual].estadual = params.get('estadual');
+    }
+    if (params.get('municipal')) {
+      TSE_CONFIG.eleicoes.municipal = params.get('municipal');
+      TSE_CONFIG.eleicoesPorTurno[turnoAtual] ||= {};
+      TSE_CONFIG.eleicoesPorTurno[turnoAtual].municipal = params.get('municipal');
+    }
+    CONFIG_MANUAL = Boolean(params.get('ano') || params.get('ciclo') || params.get('federal') || params.get('estadual') || params.get('municipal'));
+
+    /* Atualização inicial: sincroniza o perfil com a configuração oficial e inicia a consulta. */
+    configurarEleicao(tipoEleicaoPorAno(Number(TSE_CONFIG.ano)) ? Number(TSE_CONFIG.ano) : obterAnoInicial(), true);
+    atualizarVisibilidadeEleicoes();
+    carregarConfiguracaoTSE().finally(() => {
+      atualizarPerfilVisual();
+      atualizarTurnButtons();
+      render(cargoAtual, 'inicial').then(iniciarAutoRefresh);
+    });
+  </script>
+</body>
+</html>
