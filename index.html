@@ -95,6 +95,19 @@
     .uf-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: .78rem; }
     .uf-chip i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
     .uf-chip strong { color: var(--text); }
+    .uf-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+    .uf-toolbar .uf-tally { margin: 0; }
+    .uf-view.selector button { padding: 7px 14px; font-size: .8rem; }
+    .uf-grid[hidden], .uf-map-wrap[hidden] { display: none; }
+    .uf-map-wrap { display: grid; justify-items: center; gap: 8px; }
+    .uf-map { display: grid; width: min(100%, 460px); grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: repeat(8, auto); gap: 5px; }
+    .uf-tile { display: flex; aspect-ratio: 1; min-width: 0; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 2px; border: 1px solid rgba(255,255,255,.08); border-radius: 10px; background: var(--tile, rgba(255,255,255,.05)); color: #fff; font: inherit; cursor: pointer; transition: transform .15s, box-shadow .15s; }
+    .uf-tile strong { font-size: clamp(.68rem, 2.6vw, .92rem); letter-spacing: .02em; }
+    .uf-tile span { font-size: clamp(.55rem, 2vw, .7rem); font-variant-numeric: tabular-nums; opacity: .9; }
+    .uf-tile:hover, .uf-tile:focus-visible { transform: scale(1.08); box-shadow: 0 0 0 2px rgba(255,255,255,.75); outline: none; position: relative; z-index: 1; }
+    .uf-tile[aria-pressed="true"] { box-shadow: 0 0 0 2px #fff; }
+    .uf-tile.is-pending { border-style: dashed; color: var(--muted); }
+    .uf-map-note { margin: 0; color: #7a879c; font-size: .74rem; text-align: center; }
     .uf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
     .uf-card { display: flex; min-width: 0; flex-direction: column; gap: 5px; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid var(--c, var(--line)); border-radius: 12px; background: var(--panel); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
     .uf-card:hover, .uf-card:focus-visible { border-color: rgba(59,130,246,.7); border-left-color: var(--c, rgba(59,130,246,.7)); outline: none; }
@@ -183,8 +196,18 @@
         <h2 id="ufTitle">Presidente por estado</h2>
         <p class="uf-meta" id="ufMeta" aria-live="polite"></p>
       </div>
-      <div class="uf-tally" id="ufTally"></div>
-      <div class="uf-grid" id="ufGrid"></div>
+      <div class="uf-toolbar">
+        <div class="uf-tally" id="ufTally"></div>
+        <div class="selector uf-view" role="group" aria-label="Visualização por estado">
+          <button type="button" data-uf-view="mapa" aria-pressed="true">Mapa</button>
+          <button type="button" data-uf-view="lista" aria-pressed="false">Lista</button>
+        </div>
+      </div>
+      <div class="uf-map-wrap" id="ufMapWrap">
+        <div class="uf-map" id="ufMap" role="group" aria-label="Mapa do Brasil por UF"></div>
+        <p class="uf-map-note">Cor = candidato que lidera na UF · quanto mais forte, maior o percentual do líder. Toque numa UF para ver todos os candidatos.</p>
+      </div>
+      <div class="uf-grid" id="ufGrid" hidden></div>
       <div class="uf-detail" id="ufDetail" hidden></div>
     </section>
 
@@ -244,6 +267,17 @@
     /* Para Presidente o TSE também publica os votos do exterior (UF "zz"). */
     const UFS_PRESIDENTE = [...ESTADOS, ['zz', 'Exterior']];
     const ESTADO_MAP = Object.fromEntries(UFS_PRESIDENTE);
+    /* Mapa em blocos: posição aproximada de cada UF numa grade 7×8 (coluna, linha). */
+    const POSICAO_MAPA = {
+      rr: [2, 1], ap: [4, 1],
+      am: [2, 2], pa: [3, 2], ma: [4, 2], ce: [5, 2], rn: [6, 2],
+      ac: [1, 3], ro: [2, 3], to: [3, 3], pi: [4, 3], pe: [5, 3], pb: [6, 3],
+      mt: [2, 4], go: [3, 4], ba: [4, 4], se: [5, 4], al: [6, 4],
+      ms: [2, 5], df: [3, 5], mg: [4, 5], es: [5, 5],
+      pr: [2, 6], sp: [3, 6], rj: [4, 6],
+      sc: [2, 7],
+      rs: [2, 8], zz: [7, 8]
+    };
     let estadoAtual = 'rj';
     let municipioAtual = null; // { cd, nm } — somente eleições municipais
     let turnoAtual = Number(TSE_CONFIG.turno) || 1;
@@ -572,6 +606,8 @@
     const munSearch = document.getElementById('munSearch');
     const ufSection = document.getElementById('ufSection');
     const ufGrid = document.getElementById('ufGrid');
+    const ufMap = document.getElementById('ufMap');
+    const ufMapWrap = document.getElementById('ufMapWrap');
     const ufTally = document.getElementById('ufTally');
     const ufMeta = document.getElementById('ufMeta');
     const ufDetail = document.getElementById('ufDetail');
@@ -1013,6 +1049,12 @@
       let carregadas = 0;
       let falhas = 0;
       const grid = document.createDocumentFragment();
+      const mapa = document.createDocumentFragment();
+      const selecionarUF = uf => {
+        porUF.selecionada = porUF.selecionada === uf ? null : uf;
+        renderPresidenteUF();
+        if (porUF.selecionada) ufDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      };
 
       for (const [uf, nome] of UFS_PRESIDENTE) {
         const d = porUF.dados.get(uf);
@@ -1072,14 +1114,42 @@
         }
 
         card.append(top, leader, sub, bar, sec);
-        card.addEventListener('click', () => {
-          porUF.selecionada = porUF.selecionada === uf ? null : uf;
-          renderPresidenteUF();
-          if (porUF.selecionada) ufDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        });
+        card.addEventListener('click', () => selecionarUF(uf));
         grid.append(card);
+
+        const tile = document.createElement('button');
+        tile.type = 'button';
+        tile.className = 'uf-tile';
+        tile.dataset.uf = uf;
+        tile.setAttribute('aria-pressed', String(porUF.selecionada === uf));
+        const [col, lin] = POSICAO_MAPA[uf];
+        tile.style.gridColumn = String(col);
+        tile.style.gridRow = String(lin);
+        const tileSigla = document.createElement('strong');
+        tileSigla.textContent = sigla.textContent;
+        const tilePct = document.createElement('span');
+        if (d?.candidatos?.length) {
+          const candidatos = [...d.candidatos].sort((a, b) => b.votos - a.votos);
+          const total = candidatos.reduce((s, c) => s + c.votos, 0);
+          const p1 = percentualCandidato(candidatos[0], total);
+          // Intensidade: 35% do líder = cor fraca; 80% ou mais = cor cheia.
+          const forca = Math.round(30 + 70 * Math.max(0, Math.min(1, (p1 - 35) / 45)));
+          tile.style.setProperty('--tile', `color-mix(in srgb, ${corDe(candidatos[0])} ${forca}%, #1b2233)`);
+          tilePct.textContent = `${fmtPercent.format(p1)}%`;
+          tile.title = `${nome}: ${candidatos[0].nome} ${fmtPercent.format(p1)}% · ${fmtPercent.format(d.secoesPct)}% das seções`;
+          tile.setAttribute('aria-label', card.getAttribute('aria-label'));
+        } else {
+          tile.classList.add('is-pending');
+          tilePct.textContent = d?.erro ? '—' : '…';
+          tile.title = d?.erro ? `${nome}: indisponível (${d.erro})` : `${nome}: carregando`;
+          tile.setAttribute('aria-label', tile.title);
+        }
+        tile.append(tileSigla, tilePct);
+        tile.addEventListener('click', () => selecionarUF(uf));
+        mapa.append(tile);
       }
       ufGrid.replaceChildren(grid);
+      ufMap.replaceChildren(mapa);
 
       // Em quantas UFs cada candidato lidera (o exterior não conta como UF).
       const placar = document.createDocumentFragment();
@@ -1150,6 +1220,17 @@
       ufDetail.replaceChildren(head, lista);
       ufDetail.hidden = false;
     }
+
+    /* Alterna entre mapa e lista; a preferência fica salva neste navegador. */
+    function definirVisaoUF(visao) {
+      const mapa = visao !== 'lista';
+      ufMapWrap.hidden = !mapa;
+      ufGrid.hidden = mapa;
+      document.querySelectorAll('[data-uf-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.ufView === (mapa ? 'mapa' : 'lista'))));
+      try { localStorage.setItem('apuracao-visao-uf', mapa ? 'mapa' : 'lista'); } catch (_) { /* armazenamento indisponível */ }
+    }
+    document.querySelectorAll('[data-uf-view]').forEach(b => b.addEventListener('click', () => definirVisaoUF(b.dataset.ufView)));
+    try { definirVisaoUF(localStorage.getItem('apuracao-visao-uf') || 'mapa'); } catch (_) { definirVisaoUF('mapa'); }
 
     /* ================================================================
        SELEÇÃO DE UF / MUNICÍPIO
