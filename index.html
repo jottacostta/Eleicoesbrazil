@@ -86,6 +86,33 @@
       background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.3);
       color: #fcd34d; font-size: .82rem; text-align: center;
     }
+    .uf-section { margin-top: 30px; }
+    .uf-section[hidden] { display: none; }
+    .uf-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; margin-bottom: 10px; }
+    .uf-head h2 { margin: 0; font-size: 1.1rem; letter-spacing: -.02em; }
+    .uf-meta { margin: 0; color: #7a879c; font-size: .78rem; }
+    .uf-tally { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .uf-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: .78rem; }
+    .uf-chip i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+    .uf-chip strong { color: var(--text); }
+    .uf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+    .uf-card { display: flex; min-width: 0; flex-direction: column; gap: 5px; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid var(--c, var(--line)); border-radius: 12px; background: var(--panel); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+    .uf-card:hover, .uf-card:focus-visible { border-color: rgba(59,130,246,.7); border-left-color: var(--c, rgba(59,130,246,.7)); outline: none; }
+    .uf-card[aria-pressed="true"] { border-color: rgba(59,130,246,.85); border-left-color: var(--c, rgba(59,130,246,.85)); background: rgba(59,130,246,.14); }
+    .uf-card-top { display: flex; justify-content: space-between; gap: 6px; color: var(--muted); font-size: .72rem; }
+    .uf-card-top strong { color: var(--text); font-size: .9rem; }
+    .uf-card-top span, .uf-leader, .uf-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .uf-leader { font-size: .84rem; font-weight: 700; }
+    .uf-sub { color: var(--muted); font-size: .72rem; font-variant-numeric: tabular-nums; }
+    .uf-bar { display: flex; height: 5px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.08); }
+    .uf-bar span { height: 100%; }
+    .uf-detail { margin-top: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.03); }
+    .uf-detail[hidden] { display: none; }
+    .uf-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .uf-detail-head h3 { margin: 0; font-size: 1rem; }
+    .uf-detail-head p { margin: 4px 0 0; color: var(--muted); font-size: .78rem; }
+    .mun-search { width: 100%; margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.05); color: var(--text); font: inherit; }
+    .mun-search[hidden] { display: none; }
     @keyframes fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     @media (max-width: 480px) {
       body { padding: 24px 12px 32px; }
@@ -105,7 +132,7 @@
     <header>
       <h1>Apuração TSE</h1>
       <p class="subtitle" id="subtitle">Apuração oficial em tempo real · seleção de cargo, turno e UF</p>
-      <span class="status-note">
+      <span class="status-note" id="statusNote">
         <span class="status-dot" aria-hidden="true"></span>
         1º turno · atualização automática
       </span>
@@ -139,6 +166,7 @@
           </div>
           <button id="closeStateModal" class="modal-close" type="button" aria-label="Fechar">×</button>
         </div>
+        <input id="munSearch" class="mun-search" type="search" placeholder="Buscar município…" aria-label="Buscar município" hidden>
         <div id="stateGrid" class="state-grid"></div>
       </div>
     </div>
@@ -148,6 +176,16 @@
     <p class="meta" id="meta"></p>
     <section class="results" id="results" aria-label="Resultados dos candidatos">
       <div class="loading">Carregando dados oficiais…</div>
+    </section>
+
+    <section class="uf-section" id="ufSection" hidden aria-labelledby="ufTitle">
+      <div class="uf-head">
+        <h2 id="ufTitle">Presidente por estado</h2>
+        <p class="uf-meta" id="ufMeta" aria-live="polite"></p>
+      </div>
+      <div class="uf-tally" id="ufTally"></div>
+      <div class="uf-grid" id="ufGrid"></div>
+      <div class="uf-detail" id="ufDetail" hidden></div>
     </section>
 
     <footer class="footer">
@@ -183,7 +221,10 @@
     };
 
     function getApiBase() { return `https://resultados.tse.jus.br/${TSE_CONFIG.ambiente}/${TSE_CONFIG.ciclo}`; }
+    function padEleicao(eleicao) { return String(eleicao).padStart(6, '0'); }
     const REFRESH_MS = 5000;
+    /* A visão por estado faz 28 consultas por ciclo; atualiza com menos frequência. */
+    const UF_REFRESH_MS = 30000;
 
     // Compatibilidade com futuras eleições: uma configuração externa pode
     // sobrescrever os valores acima antes do carregamento, via window.TSE_CONFIG_OVERRIDE.
@@ -200,8 +241,11 @@
       ['pe','Pernambuco'], ['pi','Piauí'], ['rj','Rio de Janeiro'], ['rn','Rio Grande do Norte'], ['rs','Rio Grande do Sul'],
       ['ro','Rondônia'], ['rr','Roraima'], ['sc','Santa Catarina'], ['sp','São Paulo'], ['se','Sergipe'], ['to','Tocantins']
     ];
-    const ESTADO_MAP = Object.fromEntries(ESTADOS.map(([uf, nome]) => [uf, nome]));
+    /* Para Presidente o TSE também publica os votos do exterior (UF "zz"). */
+    const UFS_PRESIDENTE = [...ESTADOS, ['zz', 'Exterior']];
+    const ESTADO_MAP = Object.fromEntries(UFS_PRESIDENTE);
     let estadoAtual = 'rj';
+    let municipioAtual = null; // { cd, nm } — somente eleições municipais
     let turnoAtual = Number(TSE_CONFIG.turno) || 1;
 
     const PERFIS = {
@@ -220,7 +264,7 @@
         ano: 2028,
         label: 'Eleições Municipais',
         cargos: {
-          prefeito: { label: 'Prefeito', tipoEleicao: 'municipal', cargo: '0003' },
+          prefeito: { label: 'Prefeito', tipoEleicao: 'municipal', cargo: '0011' },
           vereador: { label: 'Vereador', tipoEleicao: 'municipal', cargo: '0013' }
         }
       }
@@ -236,13 +280,6 @@
     // atual sem precisar ser alterada manualmente a cada nova eleição.
     function tipoEleicaoPorAno(ano) {
       return Number(ano) % 4 === 2 ? 'geral' : Number(ano) % 4 === 0 ? 'municipal' : null;
-    }
-
-    function proximaEleicaoAno(ano = new Date().getFullYear()) {
-      const y = Number(ano);
-      const resto = ((y % 4) + 4) % 4;
-      if (resto === 2 || resto === 0) return y;
-      return y + (resto === 1 ? 1 : 3);
     }
 
     function ultimaEleicaoAno(ano = new Date().getFullYear()) {
@@ -341,11 +378,11 @@
       turnButtons.forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.turno) === turnoAtual)));
     }
 
-    function getEleicao(cargo) {
+    function getEleicao(cargo, turno = turnoAtual) {
       const cfg = CARGOS[cargo];
       if (!cfg) return null;
       const tipo = cfg.tipoEleicao;
-      return TSE_CONFIG.eleicoesPorTurno?.[turnoAtual]?.[tipo] || TSE_CONFIG.eleicoes?.[tipo] || null;
+      return TSE_CONFIG.eleicoesPorTurno?.[turno]?.[tipo] || (turno === 1 ? TSE_CONFIG.eleicoes?.[tipo] : null) || null;
     }
 
     function temSegundoTurno(cargo) {
@@ -359,52 +396,79 @@
       eleicaoAtual = ano;
       perfilAtual = tipo;
       CARGOS = PERFIS[perfilAtual].cargos;
-      cargoAtual = Object.keys(CARGOS)[0];
+      if (!CARGOS[cargoAtual]) cargoAtual = Object.keys(CARGOS)[0];
       renderElectionButtons();
       renderCargoButtons();
       atualizarPerfilVisual();
       atualizarTurnButtons();
     }
 
+    function rotuloCargo(cargo) {
+      const cfg = CARGOS[cargo];
+      if (cfg.nacional) return cfg.label;
+      if (cfg.tipoEleicao === 'municipal') {
+        return municipioAtual ? `${cfg.label} (${municipioAtual.nm}/${estadoAtual.toUpperCase()})` : cfg.label;
+      }
+      return `${cfg.label} (${estadoAtual.toUpperCase()})`;
+    }
+
+    /* Marca o cargo ativo e mostra o local consultado somente no botão ativo. */
+    function marcarCargo(cargo) {
+      document.querySelectorAll('#cargoSelector [data-cargo]').forEach(b => {
+        const cfg = CARGOS[b.dataset.cargo];
+        const ativo = b.dataset.cargo === cargo;
+        let sufixo = '';
+        if (ativo && !cfg.nacional) {
+          if (cfg.tipoEleicao !== 'municipal') sufixo = ` · ${estadoAtual.toUpperCase()}`;
+          else if (municipioAtual) sufixo = ` · ${municipioAtual.nm}`;
+        }
+        b.setAttribute('aria-pressed', String(ativo));
+        b.textContent = cfg.label + sufixo;
+      });
+    }
+
     function renderCargoButtons() {
       const selector = document.getElementById('cargoSelector');
       selector.replaceChildren();
-      const keys = Object.keys(CARGOS);
-      cargoAtual = keys[0];
-      keys.forEach((cargo, i) => {
+      if (!CARGOS[cargoAtual]) cargoAtual = Object.keys(CARGOS)[0];
+      for (const cargo of Object.keys(CARGOS)) {
         const b = document.createElement('button');
         b.type = 'button';
         b.dataset.cargo = cargo;
-        b.setAttribute('aria-pressed', String(i === 0));
-        b.textContent = CARGOS[cargo].label;
-        b.addEventListener('click', async () => {
-          [...selector.querySelectorAll('[data-cargo]')].forEach(item => item.setAttribute('aria-pressed', String(item === b)));
-          cargoAtual = cargo;
-          iniciarAutoRefresh();
-          atualizarTurnButtons();
-          if (CARGOS[cargo].nacional || perfilAtual === 'municipal' && cargo === 'vereador' || perfilAtual === 'municipal' && cargo === 'prefeito') {
-            resultsEl.innerHTML = '<div class="loading">Consultando dados oficiais do TSE…</div>';
-            if (CARGOS[cargo].nacional) {
-              await render(cargo, 'troca de cargo');
-            } else {
-              abrirEstados(cargo);
-            }
-          } else {
-            abrirEstados(cargo);
-          }
+        b.addEventListener('click', () => {
+          // Cargos não nacionais só passam a valer depois da escolha do local;
+          // fechar o modal mantém o cargo e o local anteriores.
+          if (CARGOS[cargo].nacional) selecionarCargo(cargo, 'troca de cargo');
+          else abrirEstados(cargo);
         });
         selector.appendChild(b);
-      });
+      }
+      marcarCargo(cargoAtual);
+    }
+
+    function selecionarCargo(cargo, motivo) {
+      cargoAtual = cargo;
+      marcarCargo(cargo);
+      atualizarTurnButtons();
+      iniciarAutoRefresh();
+      resultsEl.innerHTML = '<div class="loading">Consultando dados oficiais do TSE…</div>';
+      render(cargo, motivo);
+    }
+
+    function definirStatus(texto) {
+      const note = document.getElementById('statusNote');
+      if (!note) return;
+      note.innerHTML = '<span class="status-dot" aria-hidden="true"></span> ';
+      note.append(`${turnoAtual}º turno · ${texto}`);
     }
 
     function atualizarPerfilVisual() {
       const p = document.getElementById('electionProfile');
       const subtitle = document.getElementById('subtitle');
-      const turnoNote = document.querySelector('header .status-note');
       if (p) p.textContent = `${TSE_CONFIG.ano} · ${PERFIS[perfilAtual].label} · ciclo ${TSE_CONFIG.ciclo}`;
       if (subtitle) subtitle.textContent = `${TSE_CONFIG.ano} · apuração oficial em tempo real · configuração dinâmica do TSE`;
       document.title = `Apuração TSE · Eleições ${TSE_CONFIG.ano}`;
-      if (turnoNote) turnoNote.innerHTML = `<span class="status-dot" aria-hidden="true"></span> ${turnoAtual}º turno · atualização automática`;
+      definirStatus('atualização automática');
     }
 
     async function carregarConfiguracaoTSE() {
@@ -420,13 +484,16 @@
         for (const pl of pleitos) {
           for (const e of (Array.isArray(pl.e) ? pl.e : [])) {
             const nome = String(e.nm || '').toLowerCase();
-            const tipo = nome.includes('federal') ? 'federal' : nome.includes('estadual') ? 'estadual' : nome.includes('municipal') ? 'municipal' : null;
+            const tipo = nome.includes('federal') ? 'federal' : nome.includes('estadual') ? 'estadual' : nome.includes('municip') ? 'municipal' : null;
             const turno = Number(e.t);
             if (!tipo || ![1, 2].includes(turno) || !e.cd) continue;
             TSE_CONFIG.eleicoesPorTurno[turno] ||= {};
             TSE_CONFIG.eleicoesPorTurno[turno][tipo] = String(e.cd);
             if (turno === 1) TSE_CONFIG.eleicoes[tipo] = String(e.cd);
-            if (turno === 1 && e.cdt2) TSE_CONFIG.eleicoesPorTurno[2][tipo] = String(e.cdt2);
+            if (turno === 1 && e.cdt2) {
+              TSE_CONFIG.eleicoesPorTurno[2] ||= {};
+              TSE_CONFIG.eleicoesPorTurno[2][tipo] = String(e.cdt2);
+            }
           }
         }
         selecionarPerfil();
@@ -441,15 +508,22 @@
       const cfg = CARGOS[cargo];
       const eleicao = getEleicao(cargo);
       if (!eleicao) return [];
+      const e = padEleicao(eleicao);
       if (cfg.nacional) {
-        return [`${getApiBase()}/${eleicao}/dados/br/br-c${cfg.cargo}-e${String(eleicao).padStart(6, '0')}-u.json`];
+        return [`${getApiBase()}/${eleicao}/dados/br/br-c${cfg.cargo}-e${e}-u.json`];
       }
       const uf = estadoAtual;
+      if (cfg.tipoEleicao === 'municipal') {
+        // Eleições municipais: um arquivo por município (código TSE de 5 dígitos).
+        if (!municipioAtual) return [];
+        return [`${getApiBase()}/${eleicao}/dados/${uf}/${uf}${municipioAtual.cd}-c${cfg.cargo}-e${e}-u.json`];
+      }
       const cargoCode = (cargo === 'deputadoEstadual' && uf === 'df') ? '0008' : cfg.cargo;
-      return [`${getApiBase()}/${eleicao}/dados/${uf}/${uf}-c${cargoCode}-e${String(eleicao).padStart(6, '0')}-u.json`];
+      return [`${getApiBase()}/${eleicao}/dados/${uf}/${uf}-c${cargoCode}-e${e}-u.json`];
     }
 
-    /* Snapshot de segurança. Nunca é apresentado como dado ao vivo. */
+    /* Snapshot de segurança do 1º turno de 2026. Nunca é apresentado como dado ao vivo. */
+    const FALLBACK_FONTE = 'snapshot local do 1º turno de 2026 — NÃO é atualização do TSE';
     const FALLBACK = {
       presidente: {
         candidatos: [
@@ -466,9 +540,9 @@
           { nome: 'Veterinário Wilson Grassi', partido: 'DEMOCRATA', votos: 11041, percentual: 0.01 },
           { nome: 'Rui Costa Pimenta', partido: 'PCO', votos: 10267, percentual: 0.01 }
         ],
-        secoesPct: 64.81,
-        fonte: 'snapshot local — NÃO é atualização do TSE'
+        secoesPct: 64.81
       },
+      /* Snapshot estadual existente somente para o RJ. */
       governador: {
         candidatos: [
           { nome: 'Douglas Ruas', partido: 'PL', votos: 2359207, percentual: 50.69 },
@@ -481,12 +555,8 @@
           { nome: 'Cyro Garcia', partido: 'PSTU', votos: 7905, percentual: 0.17 },
           { nome: 'Luan Monteiro', partido: 'PCO', votos: 1570, percentual: 0.03 }
         ],
-        secoesPct: 56.91,
-        fonte: 'snapshot local — NÃO é atualização do TSE'
-      },
-      senador: { candidatos: [], secoesPct: null, fonte: 'sem snapshot local — aguardando arquivo oficial do TSE' },
-      deputadoFederal: { candidatos: [], secoesPct: null, fonte: 'sem snapshot local — aguardando arquivo oficial do TSE' },
-      deputadoEstadual: { candidatos: [], secoesPct: null, fonte: 'sem snapshot local — aguardando arquivo oficial do TSE' }
+        secoesPct: 56.91
+      }
     };
 
     const resultsEl = document.getElementById('results');
@@ -499,19 +569,29 @@
     const stateModalTitle = document.getElementById('stateModalTitle');
     const stateModalSubtitle = document.getElementById('stateModalSubtitle');
     const closeStateModal = document.getElementById('closeStateModal');
+    const munSearch = document.getElementById('munSearch');
+    const ufSection = document.getElementById('ufSection');
+    const ufGrid = document.getElementById('ufGrid');
+    const ufTally = document.getElementById('ufTally');
+    const ufMeta = document.getElementById('ufMeta');
+    const ufDetail = document.getElementById('ufDetail');
 
     const fmtInt = new Intl.NumberFormat('pt-BR');
     const fmtPercent = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const horaAgora = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
     let cargoAtual = 'presidente';
     let timer = null;
     let autoRefreshHabilitado = true;
     let requestSeq = 0;
     let controller = null;
-    let ultimaAtualizacaoTSE = null;
 
     function initials(name) {
       return name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toLocaleUpperCase('pt-BR') || '?';
+    }
+
+    function normalizar(texto) {
+      return String(texto).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
     }
 
     function parseNumber(value) {
@@ -533,13 +613,6 @@
       const text = String(value).trim().replace('%', '').replace(',', '.');
       const n = Number(text);
       return Number.isFinite(n) ? n : 0;
-    }
-
-    function formatTseDateTime(raw) {
-      const date = String(raw || '').trim();
-      if (!date) return null;
-      /* O TSE costuma fornecer dg/hg separados. Mantemos o valor original. */
-      return date;
     }
 
     function extrairCandidatos(raw) {
@@ -604,50 +677,43 @@
       };
     }
 
+    /* Baixa e interpreta um arquivo de resultado oficial do TSE. */
+    async function buscarResultado(baseUrl, signal) {
+      const url = `${baseUrl}?nocache=${Date.now()}`;
+      const res = await fetch(url, {
+        method: 'GET',
+        cache: 'no-store',
+        credentials: 'omit',
+        headers: { 'Accept': 'application/json' },
+        signal
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const json = await res.json();
+      const candidatos = extrairCandidatos(json);
+      if (!candidatos.length) throw new Error('JSON recebido, mas nenhuma candidatura foi localizada.');
+
+      const progresso = obterProgresso(json);
+      return {
+        candidatos,
+        ...progresso,
+        gerado: progresso.data && progresso.hora ? `${progresso.data} ${progresso.hora}` : null,
+        fonte: 'TSE · arquivo oficial',
+        url,
+        isFallback: false
+      };
+    }
+
     async function tentarFetch(urls, seq) {
       if (controller) controller.abort();
       controller = new AbortController();
 
       let ultimoErro = null;
       for (const baseUrl of urls) {
-        const url = `${baseUrl}?nocache=${Date.now()}-${seq}`;
         try {
-          const res = await fetch(url, {
-            method: 'GET',
-            cache: 'no-store',
-            credentials: 'omit',
-            headers: { 'Accept': 'application/json' },
-            signal: controller.signal
-          });
-
-          if (!res.ok) {
-            ultimoErro = new Error(`HTTP ${res.status}`);
-            continue;
-          }
-
-          const json = await res.json();
-          const candidatos = extrairCandidatos(json);
-          if (!candidatos.length) {
-            ultimoErro = new Error('JSON recebido, mas nenhuma candidatura foi localizada.');
-            continue;
-          }
-
+          const resultado = await buscarResultado(baseUrl, controller.signal);
           if (seq !== requestSeq) return null;
-
-          const progresso = obterProgresso(json);
-          const gerado = formatTseDateTime(progresso.data) && formatTseDateTime(progresso.hora)
-            ? `${progresso.data} ${progresso.hora}`
-            : null;
-
-          return {
-            candidatos,
-            ...progresso,
-            gerado,
-            fonte: 'TSE · arquivo oficial',
-            url,
-            raw: json,
-            isFallback: false
-          };
+          return resultado;
         } catch (err) {
           if (err?.name === 'AbortError') return null;
           ultimoErro = err;
@@ -659,42 +725,49 @@
 
     async function carregarDados(cargo, seq) {
       const cfg = CARGOS[cargo];
+      const label = rotuloCargo(cargo);
       try {
-        return { label: cfg.nacional ? cfg.label : `${cfg.label} (${estadoAtual.toUpperCase()})`, ...(await tentarFetch(urlsCargo(cargo), seq)) };
+        const resultado = await tentarFetch(urlsCargo(cargo), seq);
+        return resultado ? { label, ...resultado } : null;
       } catch (err) {
-        /* Snapshots estaduais existentes nesta versão são somente do RJ.
-           Nunca reutilizar um snapshot do RJ para outra UF. */
-        const fb = (estadoAtual === 'rj') ? FALLBACK[cargo] : null;
+        /* O snapshot é do 1º turno de 2026; o estadual existe somente para o RJ.
+           Nunca reutilizar o snapshot para outra UF, turno ou eleição. */
+        const snapshotAplicavel = TSE_CONFIG.ano === 2026 && turnoAtual === 1 && (cfg.nacional || estadoAtual === 'rj');
+        const fb = snapshotAplicavel ? FALLBACK[cargo] : null;
         if (fb) {
           return {
-            label: cfg.nacional ? cfg.label : `${cfg.label} (${estadoAtual.toUpperCase()})`,
+            label,
             candidatos: fb.candidatos,
             secoesPct: fb.secoesPct,
-            fonte: fb.fonte,
+            fonte: FALLBACK_FONTE,
             isFallback: true,
             erro: err?.message || 'Falha desconhecida'
           };
         }
         return {
-          label: `${cfg.label} (${estadoAtual.toUpperCase()})`,
+          label,
           candidatos: [],
           secoesPct: null,
-          fonte: 'TSE indisponível — sem snapshot local para esta UF',
+          fonte: 'TSE indisponível — sem snapshot local para esta seleção',
           isFallback: true,
           erro: err?.message || 'Falha desconhecida'
         };
       }
     }
 
-    function renderCards(selecionado) {
-      const candidatos = [...selecionado.candidatos].sort((a, b) => b.votos - a.votos);
+    function percentualCandidato(candidate, total) {
+      return candidate.percentual > 0 ? candidate.percentual : (total ? candidate.votos / total * 100 : 0);
+    }
+
+    /* Monta os cartões de candidatura, ordenados por votos.
+       corDe (opcional) fixa a cor da barra por candidato. */
+    function criarCartoes(lista, labelPadrao, corDe = null) {
+      const candidatos = [...lista].sort((a, b) => b.votos - a.votos);
       const total = candidatos.reduce((s, c) => s + c.votos, 0);
       const fragment = document.createDocumentFragment();
 
       candidatos.forEach((candidate, index) => {
-        const percentual = candidate.percentual > 0
-          ? candidate.percentual
-          : (total ? candidate.votos / total * 100 : 0);
+        const percentual = percentualCandidato(candidate, total);
 
         const card = document.createElement('article');
         card.className = 'card';
@@ -714,7 +787,7 @@
         name.textContent = candidate.nome;
         const party = document.createElement('div');
         party.className = 'candidate-party';
-        party.textContent = candidate.partido || selecionado.label;
+        party.textContent = candidate.partido || labelPadrao;
         text.append(name, party);
         info.append(avatar, text);
 
@@ -736,10 +809,17 @@
         const fill = document.createElement('div');
         fill.className = 'fill';
         fill.style.width = `${Math.max(0, Math.min(percentual, 100))}%`;
+        if (corDe) fill.style.background = corDe(candidate);
         track.append(fill);
         card.append(head, track);
         fragment.append(card);
       });
+
+      return { fragment, candidatos, total };
+    }
+
+    function renderCards(selecionado) {
+      const { fragment, candidatos, total } = criarCartoes(selecionado.candidatos, selecionado.label);
 
       if (!candidatos.length) {
         const empty = document.createElement('div');
@@ -749,43 +829,53 @@
       }
 
       resultsEl.replaceChildren(fragment);
-      summaryEl.textContent = `${selecionado.label}${CARGOS[cargoAtual]?.nacional ? '' : ` · ${estadoAtual.toUpperCase()} — ${ESTADO_MAP[estadoAtual]}`} · ${turnoAtual}º turno · ${candidatos.length} candidaturas · ${fmtInt.format(total)} votos`;
+      const cfg = CARGOS[cargoAtual];
+      const local = cfg?.nacional || cfg?.tipoEleicao === 'municipal' ? '' : ` — ${ESTADO_MAP[estadoAtual]}`;
+      summaryEl.textContent = `${selecionado.label}${local} · ${turnoAtual}º turno · ${candidatos.length} candidaturas · ${fmtInt.format(total)} votos`;
 
-      const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       const secoesTxt = selecionado.secoesPct != null
         ? `${fmtPercent.format(selecionado.secoesPct)}% das seções`
         : 'seções em apuração';
       const geradoTxt = selecionado.gerado ? ` · arquivo TSE: ${selecionado.gerado}` : '';
-      metaEl.textContent = `${secoesTxt} · ${selecionado.fonte}${geradoTxt} · consulta ${agora}`;
+      metaEl.textContent = `${secoesTxt} · ${selecionado.fonte}${geradoTxt} · consulta ${horaAgora()}`;
+    }
+
+    function mostrarAviso(resumo, html) {
+      summaryEl.textContent = resumo;
+      metaEl.textContent = '';
+      resultsEl.innerHTML = `<div class="loading">${html}</div>`;
     }
 
     async function render(cargo, motivo = 'automática') {
       cargoAtual = cargo;
       const seq = ++requestSeq;
       errorBanner.hidden = true;
+      errorBanner.textContent = '';
+      sincronizarPresidenteUF();
 
+      const cfg = CARGOS[cargo];
       if (turnoAtual === 2 && (!temSegundoTurno(cargo) || !getEleicao(cargo))) {
-        const cfg = CARGOS[cargo];
-        setStatus('TSE DISPONÍVEL · cargo sem 2º turno', 'online');
-        summaryEl.textContent = `${cfg.label} · 2º turno não aplicável`;
-        resultsEl.innerHTML = '<div class="loading"><strong>2º turno não aplicável.</strong><br>O 2º turno só é exibido quando previsto e identificado na configuração oficial do TSE para o cargo selecionado.</div>';
+        definirStatus('cargo sem 2º turno');
+        mostrarAviso(`${cfg.label} · 2º turno não aplicável`,
+          '<strong>2º turno não aplicável.</strong><br>O 2º turno só é exibido quando previsto e identificado na configuração oficial do TSE para o cargo selecionado.');
         return;
       }
-      errorBanner.textContent = '';
-      errorBanner.textContent = '';
+      if (cfg.tipoEleicao === 'municipal' && !municipioAtual) {
+        mostrarAviso(`${cfg.label} · selecione o município`,
+          'Toque no botão do cargo para escolher a UF e o município.');
+        return;
+      }
 
       try {
         const dados = await carregarDados(cargo, seq);
-        if (seq !== requestSeq) return;
+        if (!dados || seq !== requestSeq) return;
 
         renderCards(dados);
 
         if (dados.isFallback) {
-          errorBanner.textContent = `SEM CONEXÃO COM O TSE (${motivo}). Exibindo snapshot local antigo. Erro: ${dados.erro}`;
+          errorBanner.textContent = `SEM CONEXÃO COM O TSE (${motivo}). ${dados.candidatos.length ? 'Exibindo snapshot local antigo. ' : ''}Erro: ${dados.erro}`;
           errorBanner.hidden = false;
         } else {
-          ultimaAtualizacaoTSE = new Date();
-
           /*
              Quando o TSE informar 100% das seções, a apuração deste cargo/turno
              é considerada encerrada para o painel. A partir daqui não fazemos
@@ -797,15 +887,11 @@
           const limiteEncerramento = cargo === 'presidente' ? 99.99 : 100;
           if (Number.isFinite(dados.secoesPct) && dados.secoesPct >= limiteEncerramento) {
             pararAutoRefresh();
-            const note = document.querySelector('.status-note');
-            if (note) {
-              const textoLimite = cargo === 'presidente' ? '99,99% das seções' : '100% das seções';
-              note.innerHTML = `<span class="status-dot" aria-hidden="true"></span> TSE ONLINE · apuração encerrada (${textoLimite})`;
-            }
+            const textoLimite = cargo === 'presidente' ? '99,99% das seções' : '100% das seções';
+            definirStatus(`TSE ONLINE · apuração encerrada (${textoLimite})`);
           } else {
             /* Atualiza o indicador visual somente depois de uma resposta válida. */
-            const note = document.querySelector('.status-note');
-            if (note) note.innerHTML = '<span class="status-dot" aria-hidden="true"></span> TSE ONLINE · atualização automática';
+            definirStatus('TSE ONLINE · atualização automática');
           }
         }
       } catch (err) {
@@ -813,33 +899,367 @@
       }
     }
 
+    /* ================================================================
+       PRESIDENTE POR ESTADO
+       Consulta o arquivo de Presidente de cada UF (e do exterior) e
+       mostra quem lidera em cada uma. Tocar numa UF abre o detalhamento.
+       ================================================================ */
+    const CORES_LIDERES = ['#f59e0b', '#3b82f6'];
+    const COR_OUTROS = '#64748b';
+    const porUF = {
+      chave: null,          // ciclo|eleição consultados; muda com turno/eleição
+      dados: new Map(),     // uf -> resultado do TSE ou { erro }
+      selecionada: null,
+      timer: null,
+      controller: null,
+      encerrado: false,
+      consultadoEm: null,
+      renderPendente: false,
+      corDe: null
+    };
+
+    function presidenteUFAtivo() {
+      return perfilAtual === 'geral' && cargoAtual === 'presidente' && Boolean(getEleicao('presidente'));
+    }
+
+    function sincronizarPresidenteUF() {
+      if (!presidenteUFAtivo()) {
+        pararPresidenteUF();
+        ufSection.hidden = true;
+        return;
+      }
+      ufSection.hidden = false;
+      const chave = `${TSE_CONFIG.ciclo}|${getEleicao('presidente')}`;
+      if (chave !== porUF.chave) {
+        pararPresidenteUF();
+        porUF.chave = chave;
+        porUF.dados.clear();
+        porUF.encerrado = false;
+        porUF.consultadoEm = null;
+        renderPresidenteUF();
+        atualizarPresidenteUF();
+      }
+      if (!porUF.timer && !porUF.encerrado) {
+        porUF.timer = setInterval(() => { if (!document.hidden) atualizarPresidenteUF(); }, UF_REFRESH_MS);
+      }
+    }
+
+    function pararPresidenteUF() {
+      clearInterval(porUF.timer);
+      porUF.timer = null;
+      if (porUF.controller) porUF.controller.abort();
+      porUF.controller = null;
+      porUF.chave = null;
+    }
+
+    async function atualizarPresidenteUF() {
+      const eleicao = getEleicao('presidente');
+      if (!eleicao || !porUF.chave) return;
+      const chave = porUF.chave;
+      if (porUF.controller) porUF.controller.abort();
+      const ctrl = porUF.controller = new AbortController();
+      const e = padEleicao(eleicao);
+
+      await Promise.all(UFS_PRESIDENTE.map(async ([uf]) => {
+        const url = `${getApiBase()}/${eleicao}/dados/${uf}/${uf}-c0001-e${e}-u.json`;
+        try {
+          const resultado = await buscarResultado(url, ctrl.signal);
+          if (porUF.chave !== chave) return;
+          porUF.dados.set(uf, { ...resultado, erro: null });
+        } catch (err) {
+          if (err?.name === 'AbortError' || porUF.chave !== chave) return;
+          // Mantém o último dado válido da UF e apenas sinaliza a falha.
+          const anterior = porUF.dados.get(uf);
+          porUF.dados.set(uf, anterior?.candidatos ? { ...anterior, erro: err?.message } : { erro: err?.message || 'Falha desconhecida' });
+        }
+        agendarRenderUF();
+      }));
+
+      if (ctrl.signal.aborted || porUF.chave !== chave) return;
+      porUF.consultadoEm = horaAgora();
+      const todasEncerradas = UFS_PRESIDENTE.every(([uf]) => {
+        const d = porUF.dados.get(uf);
+        return d && !d.erro && d.secoesPct >= 100;
+      });
+      if (todasEncerradas) {
+        porUF.encerrado = true;
+        clearInterval(porUF.timer);
+        porUF.timer = null;
+      }
+      renderPresidenteUF();
+    }
+
+    function agendarRenderUF() {
+      if (porUF.renderPendente) return;
+      porUF.renderPendente = true;
+      requestAnimationFrame(() => {
+        porUF.renderPendente = false;
+        renderPresidenteUF();
+      });
+    }
+
+    const chaveCandidato = c => `${c.nome}|${c.partido}`;
+
+    function renderPresidenteUF() {
+      // Ranking nacional somando as UFs: define as cores dos dois primeiros.
+      const totais = new Map();
+      for (const d of porUF.dados.values()) {
+        for (const c of d.candidatos || []) totais.set(chaveCandidato(c), (totais.get(chaveCandidato(c)) || 0) + c.votos);
+      }
+      const ranking = [...totais.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
+      const corDe = c => CORES_LIDERES[ranking.indexOf(chaveCandidato(c))] || COR_OUTROS;
+      porUF.corDe = corDe;
+
+      let carregadas = 0;
+      let falhas = 0;
+      const grid = document.createDocumentFragment();
+
+      for (const [uf, nome] of UFS_PRESIDENTE) {
+        const d = porUF.dados.get(uf);
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'uf-card';
+        card.dataset.uf = uf;
+        card.setAttribute('aria-pressed', String(porUF.selecionada === uf));
+
+        const top = document.createElement('span');
+        top.className = 'uf-card-top';
+        const sigla = document.createElement('strong');
+        sigla.textContent = uf === 'zz' ? 'EXT' : uf.toUpperCase();
+        const nomeEl = document.createElement('span');
+        nomeEl.textContent = nome;
+        top.append(sigla, nomeEl);
+
+        const leader = document.createElement('span');
+        leader.className = 'uf-leader';
+        const sub = document.createElement('span');
+        sub.className = 'uf-sub';
+        const bar = document.createElement('span');
+        bar.className = 'uf-bar';
+        bar.setAttribute('aria-hidden', 'true');
+        const sec = document.createElement('span');
+        sec.className = 'uf-sub';
+
+        if (d?.candidatos?.length) {
+          carregadas++;
+          if (d.erro) falhas++;
+          const candidatos = [...d.candidatos].sort((a, b) => b.votos - a.votos);
+          const total = candidatos.reduce((s, c) => s + c.votos, 0);
+          const [primeiro, segundo] = candidatos;
+          const p1 = percentualCandidato(primeiro, total);
+          card.style.setProperty('--c', corDe(primeiro));
+          leader.textContent = primeiro.nome;
+          sub.textContent = segundo
+            ? `${fmtPercent.format(p1)}% · ${segundo.nome} ${fmtPercent.format(percentualCandidato(segundo, total))}%`
+            : `${fmtPercent.format(p1)}%`;
+          for (const c of candidatos.slice(0, 3)) {
+            const seg = document.createElement('span');
+            seg.style.width = `${Math.max(0, Math.min(percentualCandidato(c, total), 100))}%`;
+            seg.style.background = corDe(c);
+            bar.append(seg);
+          }
+          sec.textContent = `${fmtPercent.format(d.secoesPct)}% das seções${d.erro ? ' · falha na última consulta' : ''}`;
+          card.setAttribute('aria-label', `${nome}: ${primeiro.nome} lidera com ${fmtPercent.format(p1)}%, ${fmtPercent.format(d.secoesPct)}% das seções apuradas`);
+        } else if (d?.erro) {
+          falhas++;
+          leader.textContent = 'Indisponível';
+          sub.textContent = d.erro;
+          sec.textContent = 'tentando novamente';
+        } else {
+          leader.textContent = 'Carregando…';
+          sub.textContent = ' ';
+          sec.textContent = ' ';
+        }
+
+        card.append(top, leader, sub, bar, sec);
+        card.addEventListener('click', () => {
+          porUF.selecionada = porUF.selecionada === uf ? null : uf;
+          renderPresidenteUF();
+          if (porUF.selecionada) ufDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+        grid.append(card);
+      }
+      ufGrid.replaceChildren(grid);
+
+      // Em quantas UFs cada candidato lidera (o exterior não conta como UF).
+      const placar = document.createDocumentFragment();
+      const liderancasUF = new Map();
+      for (const [uf] of ESTADOS) {
+        const d = porUF.dados.get(uf);
+        if (!d?.candidatos?.length) continue;
+        const primeiro = [...d.candidatos].sort((a, b) => b.votos - a.votos)[0];
+        if (!primeiro.votos) continue;
+        const k = chaveCandidato(primeiro);
+        liderancasUF.set(k, { candidato: primeiro, ufs: (liderancasUF.get(k)?.ufs || 0) + 1 });
+      }
+      for (const { candidato, ufs } of [...liderancasUF.values()].sort((a, b) => b.ufs - a.ufs)) {
+        const chip = document.createElement('span');
+        chip.className = 'uf-chip';
+        chip.style.setProperty('--c', corDe(candidato));
+        const dot = document.createElement('i');
+        const nomeEl = document.createElement('strong');
+        nomeEl.textContent = candidato.nome;
+        chip.append(dot, nomeEl, ` lidera em ${ufs} ${ufs === 1 ? 'UF' : 'UFs'}`);
+        placar.append(chip);
+      }
+      ufTally.replaceChildren(placar);
+
+      const partes = [`${turnoAtual}º turno`, `${carregadas}/${UFS_PRESIDENTE.length} arquivos`];
+      if (falhas) partes.push(`${falhas} com falha`);
+      partes.push(porUF.encerrado ? 'apuração encerrada em todas as UFs' : `atualiza a cada ${UF_REFRESH_MS / 1000} s`);
+      if (porUF.consultadoEm) partes.push(`consulta ${porUF.consultadoEm}`);
+      ufMeta.textContent = partes.join(' · ');
+
+      renderDetalheUF();
+    }
+
+    function renderDetalheUF() {
+      const uf = porUF.selecionada;
+      const d = uf ? porUF.dados.get(uf) : null;
+      if (!uf) {
+        ufDetail.hidden = true;
+        ufDetail.replaceChildren();
+        return;
+      }
+
+      const head = document.createElement('div');
+      head.className = 'uf-detail-head';
+      const textos = document.createElement('div');
+      const titulo = document.createElement('h3');
+      titulo.textContent = `Presidente · ${uf === 'zz' ? 'Exterior' : `${uf.toUpperCase()} — ${ESTADO_MAP[uf]}`}`;
+      const sub = document.createElement('p');
+      if (d?.candidatos?.length) {
+        const total = d.candidatos.reduce((s, c) => s + c.votos, 0);
+        sub.textContent = `${turnoAtual}º turno · ${fmtPercent.format(d.secoesPct)}% das seções · ${fmtInt.format(total)} votos${d.gerado ? ` · arquivo TSE: ${d.gerado}` : ''}`;
+      } else {
+        sub.textContent = d?.erro ? `Arquivo indisponível: ${d.erro}` : 'Consultando arquivo oficial do TSE…';
+      }
+      textos.append(titulo, sub);
+      const fechar = document.createElement('button');
+      fechar.type = 'button';
+      fechar.className = 'modal-close';
+      fechar.setAttribute('aria-label', 'Fechar detalhamento');
+      fechar.textContent = '×';
+      fechar.addEventListener('click', () => { porUF.selecionada = null; renderPresidenteUF(); });
+      head.append(textos, fechar);
+
+      const lista = document.createElement('div');
+      lista.className = 'results';
+      if (d?.candidatos?.length) lista.append(criarCartoes(d.candidatos, 'Presidente', porUF.corDe).fragment);
+
+      ufDetail.replaceChildren(head, lista);
+      ufDetail.hidden = false;
+    }
+
+    /* ================================================================
+       SELEÇÃO DE UF / MUNICÍPIO
+       ================================================================ */
+    function mensagemModal(texto) {
+      const p = document.createElement('p');
+      p.className = 'modal-subtitle';
+      p.textContent = texto;
+      return p;
+    }
+
     function abrirEstados(cargo) {
       const cfg = CARGOS[cargo];
+      const municipal = cfg.tipoEleicao === 'municipal';
       stateModalTitle.textContent = `${cfg.label} · escolha o estado`;
-      stateModalSubtitle.textContent = 'A apuração será consultada no arquivo oficial do TSE para a UF selecionada.';
+      stateModalSubtitle.textContent = municipal
+        ? 'Depois da UF, escolha o município. A apuração municipal é publicada por município.'
+        : 'A apuração será consultada no arquivo oficial do TSE para a UF selecionada.';
+      munSearch.hidden = true;
+      munSearch.oninput = null;
       stateGrid.replaceChildren();
       for (const [uf, nome] of ESTADOS) {
+        if (municipal && uf === 'df') continue; // o DF não tem eleições municipais
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'state-button';
         b.dataset.uf = uf;
-        b.innerHTML = `<strong>${uf.toUpperCase()} · ${nome}</strong><span>${uf === estadoAtual ? 'Estado selecionado' : 'Selecionar'}</span>`;
+        const selecionado = uf === estadoAtual && cargo === cargoAtual;
+        b.innerHTML = `<strong>${uf.toUpperCase()} · ${nome}</strong><span>${selecionado ? 'Estado selecionado' : 'Selecionar'}</span>`;
         b.addEventListener('click', () => {
+          if (municipal) { abrirMunicipios(cargo, uf); return; }
           estadoAtual = uf;
-          stateModal.hidden = true;
-          const active = document.querySelector('[data-cargo][aria-pressed="true"]');
-          if (active) {
-            const base = CARGOS[cargo].label;
-            active.textContent = `${base} · ${estadoAtual.toUpperCase()}`;
-          }
-          iniciarAutoRefresh();
-          resultsEl.innerHTML = '<div class="loading">Consultando dados oficiais do TSE…</div>';
-          render(cargoAtual, `seleção de ${uf.toUpperCase()}`);
+          fecharEstados();
+          selecionarCargo(cargo, `seleção de ${uf.toUpperCase()}`);
         });
         stateGrid.append(b);
       }
       stateModal.hidden = false;
       closeStateModal.focus();
+    }
+
+    /* Lista oficial de municípios do TSE, uma requisição por eleição. */
+    const municipiosCache = new Map();
+    function carregarMunicipios(cargo) {
+      const eleicao = getEleicao(cargo);
+      if (!eleicao) return Promise.reject(new Error('eleição municipal ainda não configurada pelo TSE'));
+      const url = `${getApiBase()}/${eleicao}/config/mun-e${padEleicao(eleicao)}-cm.json`;
+      if (!municipiosCache.has(url)) {
+        const pedido = fetch(url, { cache: 'no-store', credentials: 'omit' })
+          .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+          .then(data => {
+            const porEstado = new Map();
+            for (const est of (Array.isArray(data?.abr) ? data.abr : [])) {
+              const mus = (Array.isArray(est.mu) ? est.mu : [])
+                .filter(m => m && m.cd && m.nm)
+                .map(m => ({ cd: String(m.cd).padStart(5, '0'), nm: String(m.nm) }))
+                .sort((a, b) => a.nm.localeCompare(b.nm, 'pt-BR'));
+              porEstado.set(String(est.cd || '').toLowerCase(), mus);
+            }
+            return porEstado;
+          });
+        pedido.catch(() => municipiosCache.delete(url));
+        municipiosCache.set(url, pedido);
+      }
+      return municipiosCache.get(url);
+    }
+
+    async function abrirMunicipios(cargo, uf) {
+      stateModalTitle.textContent = `${CARGOS[cargo].label} · ${uf.toUpperCase()} · escolha o município`;
+      stateModalSubtitle.textContent = 'Lista oficial de municípios do TSE.';
+      stateGrid.replaceChildren(mensagemModal('Carregando municípios…'));
+      munSearch.value = '';
+      munSearch.hidden = true;
+
+      let lista;
+      try {
+        lista = (await carregarMunicipios(cargo)).get(uf) || [];
+      } catch (err) {
+        stateGrid.replaceChildren(mensagemModal(`Não foi possível carregar a lista de municípios (${err?.message || 'falha desconhecida'}).`));
+        return;
+      }
+      if (stateModal.hidden) return;
+
+      const desenhar = () => {
+        const termo = normalizar(munSearch.value);
+        const frag = document.createDocumentFragment();
+        for (const m of lista) {
+          if (termo && !normalizar(m.nm).includes(termo)) continue;
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'state-button';
+          const nomeEl = document.createElement('strong');
+          nomeEl.textContent = m.nm;
+          const info = document.createElement('span');
+          info.textContent = municipioAtual?.cd === m.cd && estadoAtual === uf ? 'Município selecionado' : uf.toUpperCase();
+          b.append(nomeEl, info);
+          b.addEventListener('click', () => {
+            estadoAtual = uf;
+            municipioAtual = m;
+            fecharEstados();
+            selecionarCargo(cargo, `seleção de ${m.nm}/${uf.toUpperCase()}`);
+          });
+          frag.append(b);
+        }
+        stateGrid.replaceChildren(frag.childNodes.length ? frag : mensagemModal('Nenhum município encontrado.'));
+      };
+      munSearch.hidden = false;
+      munSearch.oninput = desenhar;
+      desenhar();
+      munSearch.focus();
     }
 
     function fecharEstados() { stateModal.hidden = true; }
@@ -862,7 +1282,7 @@
     turnButtons.forEach(button => button.addEventListener('click', async () => {
       const turno = Number(button.dataset.turno);
       if (![1, 2].includes(turno)) return;
-      if (turno === 2 && !getEleicao(cargoAtual)) { atualizarTurnButtons(); return; }
+      if (turno === 2 && !getEleicao(cargoAtual, 2)) { atualizarTurnButtons(); return; }
       turnoAtual = turno;
       TSE_CONFIG.turno = turno;
       iniciarAutoRefresh();
@@ -889,7 +1309,9 @@
     }
 
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && autoRefreshHabilitado) render(cargoAtual, 'retorno à tela');
+      if (document.hidden) return;
+      if (autoRefreshHabilitado) render(cargoAtual, 'retorno à tela');
+      if (porUF.timer) atualizarPresidenteUF();
     });
 
     /*
