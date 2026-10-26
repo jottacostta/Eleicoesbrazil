@@ -805,14 +805,18 @@
     /* Cargos em que a maioria absoluta dos votos válidos (> 50%) elege. */
     const CARGOS_MAIORIA_ABSOLUTA = ['presidente', 'governador', 'prefeito'];
 
-    /* 'eleito' quando o TSE marca o candidato (o TSE marca assim que a vitória
-       é matematicamente garantida) ou, em cargo de maioria absoluta, quando
-       passa de 50% dos votos válidos com 100% das seções apuradas.
-       Acima de 50% com a apuração em andamento ainda não é eleito. */
+    /* Percentual dos votos válidos a partir do qual o painel exibe "ELEITO",
+       em qualquer fase da apuração. */
+    const PERCENTUAL_ELEITO = 51;
+
+    /* 'eleito' quando o TSE marca o candidato, quando atinge PERCENTUAL_ELEITO
+       dos votos válidos ou, em cargo de maioria absoluta, quando passa de 50%
+       com 100% das seções apuradas. */
     function situacaoCandidato(candidate, percentual, ctx) {
       if (!ctx) return null;
       const st = normalizar(candidate.situacao);
       if (candidate.eleito || st.startsWith('eleito')) return 'eleito';
+      if (percentual >= PERCENTUAL_ELEITO) return 'eleito';
       if (ctx.maioriaAbsoluta && percentual > 50 && ctx.secoesPct >= 100) return 'eleito';
       if (/2.? ?turno/.test(st)) return 'segundo';
       return null;
