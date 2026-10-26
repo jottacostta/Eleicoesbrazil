@@ -723,7 +723,7 @@
         headers: { 'Accept': 'application/json' },
         signal
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
 
       const json = await res.json();
       const candidatos = extrairCandidatos(json);
@@ -777,7 +777,8 @@
             secoesPct: fb.secoesPct,
             fonte: FALLBACK_FONTE,
             isFallback: true,
-            erro: err?.message || 'Falha desconhecida'
+            erro: err?.message || 'Falha desconhecida',
+            status: err?.status || null
           };
         }
         return {
@@ -786,7 +787,8 @@
           secoesPct: null,
           fonte: 'TSE indisponível — sem snapshot local para esta seleção',
           isFallback: true,
-          erro: err?.message || 'Falha desconhecida'
+          erro: err?.message || 'Falha desconhecida',
+          status: err?.status || null
         };
       }
     }
@@ -882,6 +884,23 @@
       resultsEl.innerHTML = `<div class="loading">${html}</div>`;
     }
 
+    function mostrarSemSegundoTurno(cargo) {
+      const cfg = CARGOS[cargo];
+      const local = cfg.tipoEleicao === 'municipal' && municipioAtual
+        ? `${municipioAtual.nm}/${estadoAtual.toUpperCase()}`
+        : `${estadoAtual.toUpperCase()} — ${ESTADO_MAP[estadoAtual]}`;
+      // Não há o que atualizar: a consulta volta ao trocar cargo, UF ou turno.
+      pararAutoRefresh();
+      definirStatus(`sem 2º turno para ${cfg.label} nesta UF`);
+      mostrarAviso(`${cfg.label} (${local}) · 2º turno não realizado`,
+        `<strong>Não houve 2º turno para ${cfg.label} em ${local}.</strong><br>` +
+        'A disputa foi decidida no 1º turno — o TSE só publica arquivos de 2º turno onde ele acontece.<br><br>' +
+        '<span class="selector"><button type="button" id="verPrimeiroTurno" aria-pressed="true">Ver resultado do 1º turno</button></span>');
+      document.getElementById('verPrimeiroTurno')?.addEventListener('click', () => {
+        turnButtons.find(b => Number(b.dataset.turno) === 1)?.click();
+      });
+    }
+
     async function render(cargo, motivo = 'automática') {
       cargoAtual = cargo;
       const seq = ++requestSeq;
@@ -906,9 +925,23 @@
         const dados = await carregarDados(cargo, seq);
         if (!dados || seq !== requestSeq) return;
 
+        /* 403/404: o servidor respondeu, mas o arquivo não existe. No 2º turno
+           de um cargo estadual/municipal, isso significa que a disputa foi
+           decidida no 1º turno nesse local — o TSE só publica onde há 2º turno. */
+        const arquivoInexistente = dados.status === 404 || dados.status === 403;
+        if (arquivoInexistente && !dados.candidatos.length && turnoAtual === 2 && !cfg.nacional) {
+          mostrarSemSegundoTurno(cargo);
+          return;
+        }
+
         renderCards(dados);
 
-        if (dados.isFallback) {
+        if (dados.isFallback && arquivoInexistente) {
+          definirStatus('aguardando publicação do TSE');
+          errorBanner.textContent = `Arquivo ainda não publicado pelo TSE para esta seleção (${dados.erro}). O painel continuará tentando automaticamente.${dados.candidatos.length ? ' Exibindo snapshot local antigo.' : ''}`;
+          errorBanner.hidden = false;
+        } else if (dados.isFallback) {
+          definirStatus('sem conexão com o TSE');
           errorBanner.textContent = `SEM CONEXÃO COM O TSE (${motivo}). ${dados.candidatos.length ? 'Exibindo snapshot local antigo. ' : ''}Erro: ${dados.erro}`;
           errorBanner.hidden = false;
         } else {
