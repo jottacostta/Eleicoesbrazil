@@ -23,7 +23,8 @@
       color: var(--text); font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     main { width: min(100%, 780px); margin: 0 auto; }
-    header { text-align: center; margin: 0 auto 28px; }
+    header { position: relative; text-align: center; margin: 0 auto 28px; padding: 0 44px; }
+    @media (max-width: 480px) { header { padding: 0 40px; } }
     h1 { margin: 0 0 8px; font-size: clamp(1.45rem,4vw,2rem); letter-spacing: -.04em; background: linear-gradient(135deg,#c0e0ff,#8bb8ff); color: transparent; background-clip: text; -webkit-background-clip: text; }
     .subtitle { margin: 0; color: var(--muted); font-size: .96rem; }
     .status-note {
@@ -54,7 +55,37 @@
     .card { padding: 18px 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: 0 12px 30px rgba(0,0,0,.12); animation: fade-in .25s ease both; }
     .card-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
     .candidate { display: flex; min-width: 0; align-items: center; gap: 12px; }
-    .avatar { display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; border-radius: 50%; background: #2a3348; color: #fff; font-size: .82rem; font-weight: 750; }
+    .avatar { position: relative; display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; overflow: hidden; border-radius: 50%; background: #2a3348; color: #fff; font-size: .82rem; font-weight: 750; }
+    .avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+    .card[hidden] { display: none; }
+    .sem-animacao .card { animation: none; }
+    .share-btn { position: absolute; top: 0; right: 0; display: grid; width: 40px; height: 40px; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: rgba(255,255,255,.06); color: var(--text); cursor: pointer; }
+    .share-btn:hover, .share-btn:focus-visible { background: rgba(59,130,246,.18); outline: none; }
+    .share-toast { position: fixed; left: 50%; bottom: 24px; z-index: 1100; transform: translateX(-50%); padding: 10px 16px; border-radius: 999px; background: #1e293b; color: #fff; font-size: .85rem; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+    .vagas-nota { margin: 0 0 4px; color: var(--muted); font-size: .9rem; text-align: center; }
+    .mais-btn { justify-self: center; margin-top: 4px; padding: 10px 20px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.06); color: var(--text); font: inherit; font-size: .88rem; font-weight: 650; cursor: pointer; }
+    .mais-btn:hover, .mais-btn:focus-visible { background: rgba(59,130,246,.18); outline: none; }
+    .totais { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.04); }
+    .totais div { min-width: 0; }
+    .totais span { display: block; color: var(--muted); font-size: .76rem; }
+    .totais small { display: block; margin-top: 2px; color: #7a879c; font-size: .74rem; font-variant-numeric: tabular-nums; }
+    .totais strong { display: block; margin-top: 2px; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+    .lista-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; }
+    .lista-tools[hidden] { display: none; }
+    .lista-tools .mun-search { flex: 1 1 100%; order: 3; margin: 0; }
+    .switch { display: inline-flex; align-items: center; gap: 10px; color: var(--text); font-size: .9rem; cursor: pointer; }
+    .switch input { width: 42px; height: 24px; margin: 0; appearance: none; border-radius: 999px; background: rgba(255,255,255,.18); cursor: pointer; transition: background .2s; position: relative; }
+    .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; }
+    .switch input:checked { background: var(--blue); }
+    .switch input:checked::after { transform: translateX(18px); }
+    .switch input:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+    .link-btn { border: 0; background: none; color: #8bb8ff; font: inherit; font-size: .9rem; font-weight: 650; cursor: pointer; }
+    .link-btn[aria-pressed="true"] { color: #fff; text-decoration: underline; }
+    .partidos { width: 100%; border-collapse: collapse; font-size: .88rem; font-variant-numeric: tabular-nums; }
+    .partidos th, .partidos td { padding: 10px 8px; border-bottom: 1px solid var(--line); text-align: right; }
+    .partidos th:first-child, .partidos td:first-child { text-align: left; }
+    .partidos th { color: var(--muted); font-size: .76rem; font-weight: 600; }
+    .partidos .barra { display: block; height: 6px; margin-top: 6px; border-radius: 999px; background: linear-gradient(90deg,#3b82f6,#60a5fa); }
     .candidate-name { overflow-wrap: anywhere; font-size: 1rem; font-weight: 750; }
     .candidate-party { margin-top: 3px; color: var(--muted); font-size: .78rem; }
     .numbers { flex: 0 0 auto; text-align: right; }
@@ -149,6 +180,9 @@
   <main>
     <header>
       <h1>Apuração TSE</h1>
+      <button type="button" class="share-btn" id="shareBtn" aria-label="Compartilhar esta apuração" title="Compartilhar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5l7 7-7 7"/><path d="M21 12H9a6 6 0 0 0-6 6v1"/></svg>
+      </button>
       <p class="subtitle" id="subtitle">Apuração oficial em tempo real · seleção de cargo, turno e UF</p>
       <span class="status-note" id="statusNote">
         <span class="status-dot" aria-hidden="true"></span>
@@ -192,6 +226,11 @@
     <div id="errorBanner" class="error-banner" hidden></div>
     <p class="summary" id="summary" aria-live="polite"></p>
     <p class="meta" id="meta"></p>
+    <div class="lista-tools" id="listaTools" hidden>
+      <label class="switch"><input type="checkbox" id="soEleitos" checked> Somente os eleitos</label>
+      <button type="button" class="link-btn" id="porPartidoBtn" aria-pressed="false">Por partido ›</button>
+      <input type="search" class="mun-search" id="buscaCand" placeholder="Buscar candidato, partido ou número" aria-label="Buscar candidato">
+    </div>
     <section class="results" id="results" aria-label="Resultados dos candidatos">
       <div class="loading">Carregando dados oficiais…</div>
     </section>
@@ -609,6 +648,10 @@
     const stateModalSubtitle = document.getElementById('stateModalSubtitle');
     const closeStateModal = document.getElementById('closeStateModal');
     const munSearch = document.getElementById('munSearch');
+    const listaTools = document.getElementById('listaTools');
+    const soEleitosEl = document.getElementById('soEleitos');
+    const buscaCandEl = document.getElementById('buscaCand');
+    const porPartidoBtn = document.getElementById('porPartidoBtn');
     const ufSection = document.getElementById('ufSection');
     const ufGrid = document.getElementById('ufGrid');
     const ufMap = document.getElementById('ufMap');
@@ -681,6 +724,8 @@
             encontrados.push({
               id,
               nome,
+              numero: String(c.n ?? '').trim(),
+              sqcand: String(c.sqcand || '').trim(),
               partido: String(c.sg || c.partido || partido || '').trim(),
               votos: parseNumber(c.vap ?? c.votos ?? c.v ?? 0),
               percentual: parsePercent(c.pvap ?? c.percentual ?? c.pc ?? 0),
@@ -711,8 +756,13 @@
         secoesPct: parsePercent(s.pst),
         eleitorado: parseNumber(e.te),
         eleitoradoApurado: parseNumber(e.est),
-        votosValidos: parseNumber(v.tvn),
         votosTotal: parseNumber(v.tv),
+        /* Brancos, nulos e válidos (formato do TSE: vb/pvb, tvn/ptvn, vv/pvv). */
+        totais: ('vb' in v || 'tvn' in v || 'vn' in v || 'vv' in v) ? {
+          brancos: parseNumber(v.vb), pctBrancos: v.pvb != null ? parsePercent(v.pvb) : null,
+          nulos: parseNumber(v.tvn ?? v.vn), pctNulos: (v.ptvn ?? v.pvn) != null ? parsePercent(v.ptvn ?? v.pvn) : null,
+          validos: parseNumber(v.vv), pctValidos: v.pvv != null ? parsePercent(v.pvv) : null
+        } : null,
         data: String(raw?.dg || raw?.data || '').trim(),
         hora: String(raw?.hg || raw?.hora || '').trim()
       };
@@ -838,7 +888,7 @@
     /* Monta os cartões de candidatura, ordenados por votos.
        corDe (opcional) fixa a cor da barra por candidato.
        ctx (opcional) { maioriaAbsoluta, secoesPct } habilita os selos de situação. */
-    function criarCartoes(lista, labelPadrao, corDe = null, ctx = null) {
+    function criarCartoes(lista, labelPadrao, corDe = null, ctx = null, opcoes = {}) {
       const candidatos = [...lista].sort((a, b) => b.votos - a.votos);
       const total = candidatos.reduce((s, c) => s + c.votos, 0);
       const fragment = document.createDocumentFragment();
@@ -861,6 +911,16 @@
         avatar.className = 'avatar';
         avatar.setAttribute('aria-hidden', 'true');
         avatar.textContent = initials(candidate.nome);
+        if (opcoes.fotoBase && candidate.sqcand) {
+          // Foto oficial do TSE; se não existir, ficam as iniciais.
+          const img = document.createElement('img');
+          img.alt = '';
+          img.loading = 'lazy';
+          img.decoding = 'async';
+          img.src = `${opcoes.fotoBase}/${candidate.sqcand}.jpeg`;
+          img.addEventListener('error', () => img.remove());
+          avatar.append(img);
+        }
         const text = document.createElement('div');
         const name = document.createElement('div');
         name.className = 'candidate-name';
@@ -873,7 +933,7 @@
         }
         const party = document.createElement('div');
         party.className = 'candidate-party';
-        party.textContent = candidate.partido || labelPadrao;
+        party.textContent = [candidate.partido || labelPadrao, candidate.numero].filter(Boolean).join(' · ');
         text.append(name, party);
         info.append(avatar, text);
 
@@ -904,28 +964,173 @@
       return { fragment, candidatos, total, eleitos };
     }
 
+    const CARGOS_PROPORCIONAIS = ['deputadoFederal', 'deputadoEstadual', 'vereador'];
+    const POR_PAGINA = 60;
+    /* Estado da lista (expandir, filtros); volta ao padrão ao trocar cargo/UF/turno. */
+    const listaUI = { chave: null, mostrarTodos: false, somenteEleitos: true, busca: '', limite: POR_PAGINA, porPartido: false };
+    let ultimoSelecionado = null;
+
+    function urlFotos(cargo, uf) {
+      const eleicao = getEleicao(cargo);
+      return eleicao ? `${getApiBase()}/${eleicao}/fotos/${uf}` : null;
+    }
+
+    function chaveLista() {
+      return [TSE_CONFIG.ciclo, cargoAtual, estadoAtual, municipioAtual?.cd || '', turnoAtual].join('|');
+    }
+
+    function criarTotais(t) {
+      const box = document.createElement('div');
+      box.className = 'totais';
+      const base = t.brancos + t.nulos + t.validos;
+      for (const [rotulo, valor, pct] of [['Brancos', t.brancos, t.pctBrancos], ['Nulos', t.nulos, t.pctNulos], ['Válidos', t.validos, t.pctValidos]]) {
+        const item = document.createElement('div');
+        const nome = document.createElement('span');
+        nome.textContent = rotulo;
+        const qtd = document.createElement('small');
+        qtd.textContent = fmtInt.format(valor);
+        const p = document.createElement('strong');
+        const percentual = pct ?? (base ? valor / base * 100 : 0);
+        p.textContent = `${fmtPercent.format(percentual)}%`;
+        item.append(nome, qtd, p);
+        box.append(item);
+      }
+      return box;
+    }
+
+    function criarTabelaPartidos(candidatos, eleitos) {
+      const porPartido = new Map();
+      for (const c of candidatos) {
+        const k = c.partido || '—';
+        const item = porPartido.get(k) || { partido: k, eleitos: 0, votos: 0 };
+        item.votos += c.votos;
+        porPartido.set(k, item);
+      }
+      for (const c of eleitos) porPartido.get(c.partido || '—').eleitos++;
+      const linhas = [...porPartido.values()].sort((a, b) => b.eleitos - a.eleitos || b.votos - a.votos);
+      const maxEleitos = Math.max(1, ...linhas.map(l => l.eleitos));
+      const tabela = document.createElement('table');
+      tabela.className = 'partidos';
+      tabela.innerHTML = '<thead><tr><th scope="col">Partido</th><th scope="col">Eleitos</th><th scope="col">Votos</th></tr></thead>';
+      const corpo = document.createElement('tbody');
+      for (const l of linhas) {
+        const tr = document.createElement('tr');
+        const tdPartido = document.createElement('td');
+        tdPartido.textContent = l.partido;
+        if (l.eleitos) {
+          const barra = document.createElement('span');
+          barra.className = 'barra';
+          barra.style.width = `${l.eleitos / maxEleitos * 100}%`;
+          tdPartido.append(barra);
+        }
+        const tdEleitos = document.createElement('td');
+        tdEleitos.textContent = fmtInt.format(l.eleitos);
+        const tdVotos = document.createElement('td');
+        tdVotos.textContent = fmtInt.format(l.votos);
+        tr.append(tdPartido, tdEleitos, tdVotos);
+        corpo.append(tr);
+      }
+      tabela.append(corpo);
+      return tabela;
+    }
+
+    function botaoMais(texto, aoClicar) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mais-btn';
+      b.textContent = texto;
+      b.addEventListener('click', aoClicar);
+      return b;
+    }
+
     function renderCards(selecionado) {
+      ultimoSelecionado = selecionado;
+      const chave = chaveLista();
+      const mesmaSelecao = chave === listaUI.chave;
+      if (!mesmaSelecao) {
+        Object.assign(listaUI, { chave, mostrarTodos: false, somenteEleitos: true, busca: '', limite: POR_PAGINA, porPartido: false });
+        soEleitosEl.checked = true;
+        buscaCandEl.value = '';
+        porPartidoBtn.setAttribute('aria-pressed', 'false');
+      }
+      // Atualizações automáticas não repetem a animação de entrada.
+      resultsEl.classList.toggle('sem-animacao', mesmaSelecao);
+
+      const cfg = CARGOS[cargoAtual];
+      const proporcional = CARGOS_PROPORCIONAIS.includes(cargoAtual);
       // Snapshot local não recebe selo: não é resultado oficial.
       const ctx = selecionado.isFallback ? null : {
         maioriaAbsoluta: CARGOS_MAIORIA_ABSOLUTA.includes(cargoAtual),
         vagas: cargoAtual === 'senador' ? vagasSenado() : null,
         secoesPct: selecionado.secoesPct
       };
-      const { fragment, candidatos, total, eleitos } = criarCartoes(selecionado.candidatos, selecionado.label, null, ctx);
+      const opcoes = { fotoBase: selecionado.isFallback ? null : urlFotos(cargoAtual, cfg.nacional ? 'br' : estadoAtual) };
+      const { fragment: todos, candidatos, total, eleitos } = criarCartoes(selecionado.candidatos, selecionado.label, null, ctx, opcoes);
+      const cartoes = [...todos.children];
+      const fragment = document.createDocumentFragment();
+
+      if (ctx?.vagas) {
+        const nota = document.createElement('p');
+        nota.className = 'vagas-nota';
+        nota.textContent = ctx.vagas === 1 ? 'É eleito 1 senador' : `São eleitos ${ctx.vagas} senadores`;
+        fragment.append(nota);
+      }
+
+      listaTools.hidden = !proporcional || !candidatos.length;
+      if (proporcional && candidatos.length) {
+        // Deputados/vereadores: "somente os eleitos" (quando já há eleitos), busca e paginação.
+        soEleitosEl.disabled = !eleitos.length;
+        const somenteEleitos = listaUI.somenteEleitos && eleitos.length > 0 && !listaUI.busca;
+        if (listaUI.porPartido) {
+          fragment.append(criarTabelaPartidos(candidatos, eleitos));
+        } else {
+          const termo = normalizar(listaUI.busca);
+          const visiveis = cartoes.filter((card, i) => {
+            const c = candidatos[i];
+            if (somenteEleitos) return card.classList.contains('is-eleito');
+            return !termo || normalizar(`${c.nome} ${c.partido} ${c.numero}`).includes(termo);
+          });
+          const exibidos = somenteEleitos ? visiveis : visiveis.slice(0, listaUI.limite);
+          fragment.append(...exibidos);
+          if (!exibidos.length) {
+            const vazio = document.createElement('div');
+            vazio.className = 'loading';
+            vazio.textContent = 'Nenhum candidato encontrado.';
+            fragment.append(vazio);
+          }
+          if (exibidos.length < visiveis.length) {
+            fragment.append(botaoMais(`Ver mais (${fmtInt.format(visiveis.length - exibidos.length)} restantes)`, () => {
+              listaUI.limite += POR_PAGINA;
+              renderCards(ultimoSelecionado);
+            }));
+          }
+        }
+      } else {
+        // Cargos majoritários: destaque para os primeiros, demais em "Todos os candidatos".
+        const limite = Math.max(2, ctx?.vagas || 0);
+        cartoes.forEach((card, i) => { if (i >= limite && !listaUI.mostrarTodos) card.hidden = true; });
+        fragment.append(...cartoes);
+        if (cartoes.length > limite) {
+          fragment.append(botaoMais(listaUI.mostrarTodos ? 'Mostrar menos ▴' : `Todos os candidatos (${cartoes.length}) ▾`, () => {
+            listaUI.mostrarTodos = !listaUI.mostrarTodos;
+            renderCards(ultimoSelecionado);
+          }));
+        }
+      }
 
       if (!candidatos.length) {
         const empty = document.createElement('div');
         empty.className = 'loading';
         empty.textContent = 'Nenhuma candidatura disponível nesta resposta. O painel continuará tentando o arquivo oficial do TSE.';
         fragment.append(empty);
+      } else if (selecionado.totais) {
+        fragment.append(criarTotais(selecionado.totais));
       }
 
       resultsEl.replaceChildren(fragment);
-      const cfg = CARGOS[cargoAtual];
       const local = cfg?.nacional || cfg?.tipoEleicao === 'municipal' ? '' : ` — ${ESTADO_MAP[estadoAtual]}`;
       const eleitosTxt = eleitos.length && eleitos.length <= 3 ? ` · ${eleitos.length === 1 ? 'eleito' : 'eleitos'}: ${eleitos.map(c => c.nome).join(', ')}` : eleitos.length ? ` · ${eleitos.length} eleitos` : '';
-      const vagasTxt = ctx?.vagas ? ` · ${ctx.vagas} ${ctx.vagas === 1 ? 'vaga' : 'vagas'}` : '';
-      summaryEl.textContent = `${selecionado.label}${local}${vagasTxt} · ${turnoAtual}º turno · ${candidatos.length} candidaturas · ${fmtInt.format(total)} votos${eleitosTxt}`;
+      summaryEl.textContent = `${selecionado.label}${local} · ${turnoAtual}º turno · ${candidatos.length} candidaturas · ${fmtInt.format(total)} votos${eleitosTxt}`;
 
       const secoesTxt = selecionado.secoesPct != null
         ? `${fmtPercent.format(selecionado.secoesPct)}% das seções`
@@ -935,6 +1140,7 @@
     }
 
     function mostrarAviso(resumo, html) {
+      listaTools.hidden = true;
       summaryEl.textContent = resumo;
       metaEl.textContent = '';
       resultsEl.innerHTML = `<div class="loading">${html}</div>`;
@@ -959,6 +1165,7 @@
 
     async function render(cargo, motivo = 'automática') {
       cargoAtual = cargo;
+      atualizarUrl();
       const seq = ++requestSeq;
       errorBanner.hidden = true;
       errorBanner.textContent = '';
@@ -1304,7 +1511,7 @@
 
       const lista = document.createElement('div');
       lista.className = 'results';
-      if (d?.candidatos?.length) lista.append(criarCartoes(d.candidatos, 'Presidente', porUF.corDe).fragment);
+      if (d?.candidatos?.length) lista.append(criarCartoes(d.candidatos, 'Presidente', porUF.corDe, null, { fotoBase: urlFotos('presidente', 'br') }).fragment);
 
       ufDetail.replaceChildren(head, lista);
       ufDetail.hidden = false;
@@ -1490,6 +1697,63 @@
        ou defina window.TSE_CONFIG_OVERRIDE antes deste script.
        Os códigos oficiais devem ser obtidos do arquivo de configuração do TSE.
     */
+    /* Filtros da lista de deputados/vereadores. */
+    soEleitosEl.addEventListener('change', () => {
+      listaUI.somenteEleitos = soEleitosEl.checked;
+      listaUI.limite = POR_PAGINA;
+      if (ultimoSelecionado) renderCards(ultimoSelecionado);
+    });
+    buscaCandEl.addEventListener('input', () => {
+      listaUI.busca = buscaCandEl.value.trim();
+      listaUI.limite = POR_PAGINA;
+      if (listaUI.porPartido) { listaUI.porPartido = false; porPartidoBtn.setAttribute('aria-pressed', 'false'); }
+      if (ultimoSelecionado) renderCards(ultimoSelecionado);
+    });
+    porPartidoBtn.addEventListener('click', () => {
+      listaUI.porPartido = !listaUI.porPartido;
+      porPartidoBtn.setAttribute('aria-pressed', String(listaUI.porPartido));
+      if (ultimoSelecionado) renderCards(ultimoSelecionado);
+    });
+
+    /* Link direto: cargo, UF e turno ficam na URL para compartilhar. */
+    function atualizarUrl() {
+      try {
+        const url = new URL(location.href);
+        url.searchParams.set('cargo', cargoAtual);
+        url.searchParams.set('turno', String(turnoAtual));
+        if (CARGOS[cargoAtual]?.nacional) url.searchParams.delete('uf');
+        else url.searchParams.set('uf', estadoAtual);
+        if (url.href !== location.href) history.replaceState(null, '', url);
+      } catch (_) { /* file:// ou ambiente sem history */ }
+    }
+
+    let toastTimer = null;
+    function mostrarToast(texto) {
+      let toast = document.querySelector('.share-toast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.className = 'share-toast';
+        toast.setAttribute('role', 'status');
+        document.body.append(toast);
+      }
+      toast.textContent = texto;
+      toast.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { toast.hidden = true; }, 2200);
+    }
+
+    document.getElementById('shareBtn').addEventListener('click', async () => {
+      atualizarUrl();
+      const dados = { title: document.title, text: summaryEl.textContent, url: location.href };
+      try {
+        if (navigator.share) { await navigator.share(dados); return; }
+        await navigator.clipboard.writeText(location.href);
+        mostrarToast('Link copiado');
+      } catch (err) {
+        if (err?.name !== 'AbortError') mostrarToast('Não foi possível compartilhar');
+      }
+    });
+
     const params = new URLSearchParams(location.search);
     const paramTurno = Number(params.get('turno'));
     if ([1, 2].includes(paramTurno)) {
@@ -1523,6 +1787,13 @@
 
     /* Atualização inicial: sincroniza o perfil com a configuração oficial e inicia a consulta. */
     configurarEleicao(tipoEleicaoPorAno(Number(TSE_CONFIG.ano)) ? Number(TSE_CONFIG.ano) : obterAnoInicial(), true);
+    const ufParam = String(params.get('uf') || '').toLowerCase();
+    if (ESTADOS.some(([uf]) => uf === ufParam)) estadoAtual = ufParam;
+    const cargoParam = params.get('cargo');
+    if (cargoParam && CARGOS[cargoParam] && CARGOS[cargoParam].tipoEleicao !== 'municipal') {
+      cargoAtual = cargoParam;
+      marcarCargo(cargoAtual);
+    }
     atualizarVisibilidadeEleicoes();
     carregarConfiguracaoTSE().finally(() => {
       atualizarPerfilVisual();
