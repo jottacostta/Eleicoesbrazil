@@ -805,20 +805,33 @@
     /* Cargos em que a maioria absoluta dos votos válidos (> 50%) elege. */
     const CARGOS_MAIORIA_ABSOLUTA = ['presidente', 'governador', 'prefeito'];
 
+    /* O Senado renova alternadamente 2/3 e 1/3 das cadeiras:
+       2 vagas por UF em 2018, 2026, 2034…; 1 vaga em 2022, 2030, 2038… */
+    function vagasSenado(ano = TSE_CONFIG.ano) {
+      return Number(ano) % 8 === 2 ? 2 : 1;
+    }
+
     /* Percentual dos votos válidos a partir do qual o painel exibe "ELEITO",
        em qualquer fase da apuração. */
     const PERCENTUAL_ELEITO = 51;
 
-    /* 'eleito' quando o TSE marca o candidato, quando atinge PERCENTUAL_ELEITO
-       dos votos válidos ou, em cargo de maioria absoluta, quando passa de 50%
-       com 100% das seções apuradas. */
-    function situacaoCandidato(candidate, percentual, ctx) {
+    /* A situação textual do TSE (campo st) tem prioridade: o TSE também marca
+       com e="s" quem foi classificado para o 2º turno, então esse campo só
+       vale como "eleito" quando não há situação informada.
+       Sem situação, vale PERCENTUAL_ELEITO dos votos válidos ou, em cargo de
+       maioria absoluta, mais de 50% com 100% das seções apuradas. */
+    function situacaoCandidato(candidate, percentual, ctx, posicao) {
       if (!ctx) return null;
+      // Cargo com número fixo de vagas (Senado): só os mais votados podem ser eleitos.
+      if (ctx.vagas && posicao >= ctx.vagas) return null;
+      if (ctx.vagas && ctx.secoesPct >= 100) return 'eleito';
       const st = normalizar(candidate.situacao);
-      if (candidate.eleito || st.startsWith('eleito')) return 'eleito';
+      if (/2.? ?turno/.test(st)) return 'segundo';
+      if (st.includes('eleito') && !st.includes('nao eleito')) return 'eleito';
+      if (st) return null; // "não eleito", "suplente" etc.
+      if (candidate.eleito) return 'eleito';
       if (percentual >= PERCENTUAL_ELEITO) return 'eleito';
       if (ctx.maioriaAbsoluta && percentual > 50 && ctx.secoesPct >= 100) return 'eleito';
-      if (/2.? ?turno/.test(st)) return 'segundo';
       return null;
     }
 
@@ -833,7 +846,7 @@
 
       candidatos.forEach((candidate, index) => {
         const percentual = percentualCandidato(candidate, total);
-        const situacao = situacaoCandidato(candidate, percentual, ctx);
+        const situacao = situacaoCandidato(candidate, percentual, ctx, index);
         if (situacao === 'eleito') eleitos.push(candidate);
 
         const card = document.createElement('article');
@@ -895,6 +908,7 @@
       // Snapshot local não recebe selo: não é resultado oficial.
       const ctx = selecionado.isFallback ? null : {
         maioriaAbsoluta: CARGOS_MAIORIA_ABSOLUTA.includes(cargoAtual),
+        vagas: cargoAtual === 'senador' ? vagasSenado() : null,
         secoesPct: selecionado.secoesPct
       };
       const { fragment, candidatos, total, eleitos } = criarCartoes(selecionado.candidatos, selecionado.label, null, ctx);
@@ -909,8 +923,9 @@
       resultsEl.replaceChildren(fragment);
       const cfg = CARGOS[cargoAtual];
       const local = cfg?.nacional || cfg?.tipoEleicao === 'municipal' ? '' : ` — ${ESTADO_MAP[estadoAtual]}`;
-      const eleitosTxt = eleitos.length && eleitos.length <= 3 ? ` · eleito: ${eleitos.map(c => c.nome).join(', ')}` : eleitos.length ? ` · ${eleitos.length} eleitos` : '';
-      summaryEl.textContent = `${selecionado.label}${local} · ${turnoAtual}º turno · ${candidatos.length} candidaturas · ${fmtInt.format(total)} votos${eleitosTxt}`;
+      const eleitosTxt = eleitos.length && eleitos.length <= 3 ? ` · ${eleitos.length === 1 ? 'eleito' : 'eleitos'}: ${eleitos.map(c => c.nome).join(', ')}` : eleitos.length ? ` · ${eleitos.length} eleitos` : '';
+      const vagasTxt = ctx?.vagas ? ` · ${ctx.vagas} ${ctx.vagas === 1 ? 'vaga' : 'vagas'}` : '';
+      summaryEl.textContent = `${selecionado.label}${local}${vagasTxt} · ${turnoAtual}º turno · ${candidatos.length} candidaturas · ${fmtInt.format(total)} votos${eleitosTxt}`;
 
       const secoesTxt = selecionado.secoesPct != null
         ? `${fmtPercent.format(selecionado.secoesPct)}% das seções`
