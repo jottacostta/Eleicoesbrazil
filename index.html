@@ -809,16 +809,20 @@
        em qualquer fase da apuração. */
     const PERCENTUAL_ELEITO = 51;
 
-    /* 'eleito' quando o TSE marca o candidato, quando atinge PERCENTUAL_ELEITO
-       dos votos válidos ou, em cargo de maioria absoluta, quando passa de 50%
-       com 100% das seções apuradas. */
+    /* A situação textual do TSE (campo st) tem prioridade: o TSE também marca
+       com e="s" quem foi classificado para o 2º turno, então esse campo só
+       vale como "eleito" quando não há situação informada.
+       Sem situação, vale PERCENTUAL_ELEITO dos votos válidos ou, em cargo de
+       maioria absoluta, mais de 50% com 100% das seções apuradas. */
     function situacaoCandidato(candidate, percentual, ctx) {
       if (!ctx) return null;
       const st = normalizar(candidate.situacao);
-      if (candidate.eleito || st.startsWith('eleito')) return 'eleito';
+      if (/2.? ?turno/.test(st)) return 'segundo';
+      if (st.includes('eleito') && !st.includes('nao eleito')) return 'eleito';
+      if (st) return null; // "não eleito", "suplente" etc.
+      if (candidate.eleito) return 'eleito';
       if (percentual >= PERCENTUAL_ELEITO) return 'eleito';
       if (ctx.maioriaAbsoluta && percentual > 50 && ctx.secoesPct >= 100) return 'eleito';
-      if (/2.? ?turno/.test(st)) return 'segundo';
       return null;
     }
 
